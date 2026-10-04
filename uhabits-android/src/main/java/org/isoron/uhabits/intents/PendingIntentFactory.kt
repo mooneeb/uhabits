@@ -36,6 +36,7 @@ import org.isoron.uhabits.activities.habits.show.ShowHabitActivity
 import org.isoron.uhabits.core.AppScope
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.inject.AppContext
+import org.isoron.uhabits.notifications.SnoozeDelayPickerActivity
 import org.isoron.uhabits.receivers.ReminderReceiver
 import org.isoron.uhabits.receivers.WidgetReceiver
 
@@ -124,12 +125,11 @@ class PendingIntentFactory(
         )
 
     fun snoozeNotification(habit: Habit): PendingIntent =
-        getBroadcast(
+        getActivity(
             context,
             0,
-            Intent(context, ReminderReceiver::class.java).apply {
+            Intent(context, SnoozeDelayPickerActivity::class.java).apply {
                 data = Uri.parse(habit.uriString)
-                action = ReminderReceiver.ACTION_SNOOZE_REMINDER
             },
             FLAG_IMMUTABLE or FLAG_UPDATE_CURRENT
         )
