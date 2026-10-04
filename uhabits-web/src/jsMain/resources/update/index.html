@@ -8,8 +8,12 @@
 const status = document.querySelector('#status');
 document.querySelector('#update').onclick = async () => {
   try {
-    const response = await fetch('../app/index.html', {cache: 'no-store'});
-    if (!response.ok) throw new Error('The current app is unavailable. Reconnect and retry.');
+    // Refresh the browser HTTP cache as well as the service-worker cache.
+    // Unchanged scripts can otherwise retain old response metadata after deployment fixes.
+    for (const path of ['index.html', 'app.mjs', 'storage.mjs', 'drive.mjs', 'config.mjs', '../loop-core.js']) {
+      const response = await fetch(new URL('../app/' + path, location.href), {cache: 'reload'});
+      if (!response.ok) throw new Error('The current app is unavailable. Reconnect and retry.');
+    }
     for (const registration of await navigator.serviceWorker.getRegistrations()) {
       if (registration.scope === new URL('../app/', location.href).href) await registration.unregister();
     }
