@@ -40,10 +40,15 @@ signed Android / public PWA acceptance.
 | Delete-versus-edit | Native offline rename and installed-PWA offline deletion produced a deletion conflict in both clients. Native explicit Keep false retained the renamed habit; desktop reached Synchronized with Drive with no conflicts. |
 | Fresh third replica | Public importing client was navigated to the update page and native was stopped. Fresh Android Chrome authorized the same test account and downloaded all imported/later history. Its actual exported 54,688-byte full backup exactly matched the original public export: 57 envelopes and the permanent purge barrier. |
 | Installed public PWA offline | Android Chrome installed WebAPK `org.chromium.webapk.aabb6ce3a360002e6_v2`. With Wi-Fi/mobile disabled, cold launcher open retained habits. Offline 9.876/note survived another force-stop/cold launch with one pending change. Signed native 7.123/distinct note separately survived offline restart. After reconnect both actual clients preserved competing 7.123/native and 9.876/installed-PWA versions with distinct notes. Native explicit Keep 9.876 reached desktop with its note; the independent earlier-date 1.234 remained. |
+| Public temporary session | Fresh Android Chrome temporary page started empty with New habit disabled. Real Google authorization enabled online editing. October-2 2.468/note reached desktop and signed native; save status became Saved in Drive. Disabling Wi-Fi/mobile disabled New habit and showed Offline, zero pending. End cleared history and reported memory cleared. Returning to owned mode retained its earlier cached history/conflicts, and another fresh temporary page started empty. |
 | Flexible habits/statistics | Public numeric at-most 2.5 cups, 3/7 frequency, historical 1.234 and dated multiline note reached signed Android. Both displayed 100% strength and week/month/quarter/year totals/targets 1.234/2.5, /10, /32.5, /130. Native 3-times-per-week Boolean creation and October-4 calendar completion reached the public grid. |
 | Independent definition edits | Native editor rename/description and public color edit retained both after Drive reconciliation. Dated note remained separate from the description. |
 | Archive/reactivation and navigation | Public archive hid the numeric habit from native active list. Native Unarchive returned it to the public grid with its 1.234 record/note. Public search/name-sort/filter behaved as expected, and manual move propagated. Day/week/month/quarter/year graph periods and expandable values rendered. |
 | Shared settings | Public 3 a.m. day start selected October 4 before 3 a.m. October 5. Native Settings showed delayed day start enabled and Sunday week start. Native Monday selection then reached public Settings; public midnight selection returned the grid to October 5. Existing October-5 and older records retained their dates. |
+| Travel dates | Actual Android system time zone changed from Asia/Karachi to Pacific/Pago_Pago across the date boundary. Cold native and installed-PWA launches selected Sunday October 4 instead of Monday October 5; October-4 1.234 remained on October 4, and the installed PWA retained its cached October-5 conflict identity. Actual native full exports preserved all 65 prior causal changes and purge barriers unchanged. The sole additional change was the separately authorized October-1 account-check fixture. Asia/Karachi and automatic time-zone selection were restored afterward. |
+| Account isolation | With one pending October-3 0.125/note bound to the original test account, actual Google selection of mooneeb.hussain@gmail.com displayed “Stored habits belong to another Google account”. The app remained disconnected, retained the original account title and pending dated note, and did not adopt the other account. Original-account reconnect is the final cleanup step. |
+| Keyboard and touch controls | Public desktop search accepted typing and Tab moved focus to Sort. In the actual entry form, Tab moved from notes to Save entry; Enter saved the completion and closed the dialog. Public Android Chrome calendar, editor, temporary-session and launcher journeys used real touch controls. |
+| Streak/weekday comparison | Release Background Walk showed matching one-day streaks for October 3 (Skip) and October 5 (Completed) in signed native accessibility values and public details. October weekday frequency showed one recorded Monday completion and zero on every other weekday in both; native orders Saturday first, web Monday first. Both showed 5% strength. |
 
 Screenshots and actual exported fixtures are in ignored `build/issue-4-*` files.
 Notable captures: `issue-4-upgrade-before.png`, `issue-4-upgrade-after.png`,
@@ -64,8 +69,17 @@ Native 20310 reached Synchronized with Drive, zero pending.
 
 ## Remaining complete-parent acceptance
 
-Continue on the signed/public release: travel-date preservation,  temporary authorized save/end/storage isolation,  account-switch rejection with pending work,
-and temporary/account boundary checks.
+Travel-date preservation, live account-switch rejection, keyboard/touch controls
+and streak/weekday comparisons passed. Finish original-account reconnect and
+verify delivery of the retained pending edit and final outcome fixture.
+Release Three Per Week has public October-1/2/4 completions and an explicit
+October-5 Unknown undo with its keyboard-entered note. Public history distinguishes
+that Unknown with inferred completion from October-3 inferred completion without
+an original entry. Native separately completed, marked Missed, then selected
+Unknown with the same note through its actual entry dialog. Final cross-device
+convergence and native inferred/recorded comparison await public reconnection.
+Temporary mid-save interruption remains covered by the supporting boundary-fault
+checks; live ordinary save/end/offline gating passed.
 Prior debug/local issue #2/#3 evidence is in tracking-workflows.md and
 reliability-workflows.md; it does not silently count as signed/public completion.
 
