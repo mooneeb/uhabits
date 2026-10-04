@@ -72,6 +72,13 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
         }
 
     private lateinit var menu: ListHabitsMenu
+    private val driveStatus: () -> Unit = {
+        val status = (application as HabitsApplication).driveSync?.status
+        rootView.tbar.subtitle = status
+        adapter.refresh()
+        adapter.notifyDataSetChanged()
+        rootView.header.invalidate()
+    }
 
     override fun onQuestionMarksChanged() {
         invalidateOptionsMenu()
@@ -82,6 +89,11 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
         super.onCreate(savedInstanceState)
 
         appComponent = (applicationContext as HabitsApplication).component
+        if (org.isoron.uhabits.BuildConfig.DEBUG) {
+            intent?.getStringExtra("loopTestWorkspace")?.let {
+                (application as HabitsApplication).driveSync?.configureTestWorkspace(it)
+            }
+        }
         component = HabitsActivityComponent::class.create(
             parent = appComponent,
             activityContext = this
@@ -104,6 +116,7 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
     }
 
     override fun onPause() {
+        (application as HabitsApplication).driveSync?.removeListener(driveStatus)
         midnightTimer.onPause()
         screen.onDetached()
         adapter.cancelRefresh()
@@ -112,10 +125,12 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
     }
 
     override fun onResume() {
+        (application as HabitsApplication).driveSync?.addListener(driveStatus)
         adapter.refresh()
         screen.onAttached()
         rootView.postInvalidate()
         midnightTimer.onResume()
+        rootView.header.invalidate()
 
         if (appComponent.reminderScheduler.hasHabitsWithReminders()) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
@@ -157,10 +172,15 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
 
     override fun onCreateOptionsMenu(m: Menu): Boolean {
         menu.onCreate(menuInflater, m)
+        m.add(0, DRIVE_MENU_ID, 99, "Google Drive synchronization")
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == DRIVE_MENU_ID) {
+            startActivity(Intent(this, org.isoron.uhabits.sync.DriveSyncActivity::class.java))
+            return true
+        }
         invalidateOptionsMenu()
         return menu.onItemSelected(item)
     }
@@ -194,3 +214,5 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
         const val ACTION_EDIT = "org.isoron.uhabits.ACTION_EDIT"
     }
 }
+
+private const val DRIVE_MENU_ID = 982734

@@ -112,6 +112,10 @@ abstract class HabitList : Iterable<Habit> {
      */
     abstract fun remove(h: Habit)
 
+    open fun remove(habits: List<Habit>) {
+        for (habit in habits) remove(habit)
+    }
+
     /**
      * Removes all the habits from the list.
      */

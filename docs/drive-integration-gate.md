@@ -59,7 +59,7 @@ Real browser-to-Android and Android-to-browser discovery preserved 6.789 and 12.
 
 The separate packaging probe uploaded two synthetic packs totaling 2,000 records. Real discovery and complete validation used three requests, 867,768 bytes and 3,480 ms. Both probe files were deleted before it reported success. This supports bundling immutable logical changes into per-device history packs and caching already validated downloads; it does not measure Android writing such packs or establish unlimited-history performance.
 
-Cleanup deleted exactly 12 validated integration records. Subsequent discovery returned zero files on both clients. Raw token-free evidence is in ignored `build/drive-gate-evidence/`. Second-account isolation remains untested because only one test account was supplied. The production workflow and installed-PWA acceptance remain outstanding.
+Cleanup deleted exactly 12 validated integration records. Subsequent discovery returned zero files on both clients. Raw token-free evidence is in ignored `build/drive-gate-evidence/`. Second-account isolation remains untested because only one test account was supplied. The production workflow and installed-PWA acceptance were outstanding at this checkpoint; subsequent results are in [tracking workflows](tracking-workflows.md).
 
 Record the client/project configuration, APK signer, browser/device versions, test-run UUID, observed records and metrics for each direction, account isolation and reconnect outcomes, and cleanup outcome. Never capture tokens. Until the real procedure is executed, record **live gate unavailable**, not passed.
 

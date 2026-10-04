@@ -20,6 +20,7 @@ package org.isoron.uhabits.core.models.sqlite
 
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.Synchronized
+import org.isoron.uhabits.core.database.EntryRepository
 import org.isoron.uhabits.core.database.HabitData
 import org.isoron.uhabits.core.database.HabitRepository
 import org.isoron.uhabits.core.models.Frequency
@@ -46,17 +47,19 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
     private fun loadRecords() {
         if (loaded) return
         loaded = true
+        val existing = list.associateBy { it.id }
         list.removeAll()
         val records = repository.findAll()
         var shouldRebuildOrder = false
         for ((expectedPosition, rec) in records.withIndex()) {
             if (rec.position != expectedPosition) shouldRebuildOrder = true
-            val h = modelFactory.buildHabit()
+            val h = existing[rec.id] ?: modelFactory.buildHabit()
             copyTo(rec, h)
+            (h.originalEntries as SQLiteEntryList).invalidate()
             (h.originalEntries as SQLiteEntryList).habitId = h.id
             list.add(h)
         }
-        if (shouldRebuildOrder) rebuildOrder()
+        if (shouldRebuildOrder && (modelFactory as SQLModelFactory).changeStore == null) rebuildOrder()
     }
 
     @Synchronized
@@ -124,55 +127,74 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         return list.iterator()
     }
 
-    @Synchronized
-    private fun rebuildOrder() {
-        val records = repository.findAll()
-        for ((pos, r) in records.withIndex()) {
-            if (r.position != pos) {
-                r.position = pos
-                repository.update(r)
+    private fun <T> mutateRecords(action: (HabitRepository, EntryRepository) -> T): T {
+        val factory = modelFactory as SQLModelFactory
+        val store = factory.changeStore
+        return if (store == null) {
+            action(repository, factory.entryRepository)
+        } else {
+            store.captureHabits { action(HabitRepository(factory.database), EntryRepository(factory.database)) }
+        }
+    }
+
+    private fun rebuildOrder(records: HabitRepository) {
+        for ((position, record) in records.findAll().withIndex()) {
+            if (record.position != position) {
+                record.position = position
+                records.update(record)
             }
         }
     }
 
     @Synchronized
-    override fun remove(h: Habit) {
+    private fun rebuildOrder() = mutateRecords { records, _ -> rebuildOrder(records) }
+
+    @Synchronized
+    override fun remove(h: Habit) = remove(listOf(h))
+
+    @Synchronized
+    override fun remove(habits: List<Habit>) {
         loadRecords()
-        list.remove(h)
-        h.originalEntries.clear()
-        repository.delete(h.id!!)
-        rebuildOrder()
+        mutateRecords { records, entries ->
+            for (habit in habits) {
+                entries.deleteByHabitId(habit.id!!)
+                records.delete(habit.id!!)
+            }
+            rebuildOrder(records)
+        }
+        // Keep entry revisions in causal history; only remove native projection rows.
+        reload()
+        loadRecords()
         observable.notifyListeners()
     }
 
     @Synchronized
     override fun removeAll() {
+        mutateRecords { records, _ ->
+            records.execSQL("delete from habits")
+            records.execSQL("delete from repetitions")
+        }
         list.removeAll()
-        repository.execSQL("delete from habits")
-        repository.execSQL("delete from repetitions")
         observable.notifyListeners()
     }
 
     @Synchronized
     override fun reorder(from: Habit, to: Habit) {
         loadRecords()
-        val fromPos = from.position
-        val toPos = to.position
-        list.reorder(from, to)
-        if (toPos < fromPos) {
-            repository.execSQL(
-                "update habits set position = position + 1 " +
-                    "where position >= $toPos and position < $fromPos"
-            )
-        } else {
-            repository.execSQL(
-                "update habits set position = position - 1 " +
-                    "where position > $fromPos and position <= $toPos"
-            )
+        check(primaryOrder == Order.BY_POSITION) { "cannot reorder automatically sorted list" }
+        require(list.indexOf(from) >= 0) { "list does not contain (from) habit" }
+        val toIndex = list.indexOf(to)
+        require(toIndex >= 0) { "list does not contain (to) habit" }
+        val ordered = list.toMutableList().apply {
+            remove(from)
+            add(toIndex, from)
         }
-        val data = copyFrom(from)
-        data.position = toPos
-        repository.update(data)
+        mutateRecords { records, _ ->
+            for ((position, habit) in ordered.withIndex()) {
+                if (habit.position != position) records.update(copyFrom(habit).apply { this.position = position })
+            }
+        }
+        list.reorder(from, to)
         observable.notifyListeners()
     }
 
@@ -192,11 +214,10 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
     @Synchronized
     override fun update(habits: List<Habit>) {
         loadRecords()
-        list.update(habits)
-        for (h in habits) {
-            val data = copyFrom(h)
-            repository.update(data)
+        mutateRecords { records, _ ->
+            for (habit in habits) records.update(copyFrom(habit))
         }
+        list.update(habits)
         observable.notifyListeners()
     }
 
@@ -255,6 +276,8 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
                     data.reminderMin!!,
                     WeekdayList(data.reminderDays)
                 )
+            } else {
+                habit.reminder = null
             }
         }
     }

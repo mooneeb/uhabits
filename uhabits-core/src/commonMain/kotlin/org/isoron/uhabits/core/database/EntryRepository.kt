@@ -4,6 +4,7 @@ import org.isoron.platform.io.Database
 import org.isoron.platform.io.StepResult
 import org.isoron.platform.io.queryLong
 import org.isoron.platform.io.run
+import org.isoron.uhabits.core.sync.SQLiteChangeStore
 
 data class EntryData(
     var id: Long? = null,
@@ -13,7 +14,7 @@ data class EntryData(
     var notes: String = ""
 )
 
-class EntryRepository(private val db: Database) {
+class EntryRepository(private val db: Database, private val changeStore: SQLiteChangeStore? = null) {
     private val findAllByHabitStmt by lazy {
         db.prepareStatement(
             "SELECT id, habit, timestamp, value, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC"
@@ -52,7 +53,9 @@ class EntryRepository(private val db: Database) {
         return results
     }
 
-    fun insert(data: EntryData): Long {
+    fun insert(data: EntryData): Long = mutate(data.habitId!!) { insertRaw(data) }
+
+    private fun insertRaw(data: EntryData): Long {
         insertStmt.reset()
         insertStmt.bindLong(1, data.habitId!!)
         insertStmt.bindLong(2, data.timestamp)
@@ -62,18 +65,36 @@ class EntryRepository(private val db: Database) {
         return db.queryLong("SELECT last_insert_rowid()")
     }
 
-    fun deleteByHabitIdAndTimestamp(habitId: Long, timestamp: Long) {
+    fun deleteByHabitIdAndTimestamp(habitId: Long, timestamp: Long) = mutate(habitId) { deleteRaw(habitId, timestamp) }
+
+    private fun deleteRaw(habitId: Long, timestamp: Long) {
         deleteByHabitAndTimestampStmt.reset()
         deleteByHabitAndTimestampStmt.bindLong(1, habitId)
         deleteByHabitAndTimestampStmt.bindLong(2, timestamp)
         deleteByHabitAndTimestampStmt.step()
     }
 
-    fun deleteByHabitId(habitId: Long) {
+    fun deleteByHabitId(habitId: Long) = mutate(habitId) {
         deleteByHabitStmt.reset()
         deleteByHabitStmt.bindLong(1, habitId)
         deleteByHabitStmt.step()
     }
 
     fun execSQL(sql: String) = db.run(sql)
+
+    fun replace(data: EntryData): Long = mutate(data.habitId!!) {
+        db.run("SAVEPOINT loop_entry_replace")
+        try {
+            deleteRaw(data.habitId!!, data.timestamp)
+            val id = insertRaw(data)
+            db.run("RELEASE loop_entry_replace")
+            id
+        } catch (error: Throwable) {
+            db.run("ROLLBACK TO loop_entry_replace")
+            db.run("RELEASE loop_entry_replace")
+            throw error
+        }
+    }
+
+    private fun <T> mutate(habitId: Long, action: () -> T): T = changeStore?.captureEntries(habitId, action) ?: action()
 }

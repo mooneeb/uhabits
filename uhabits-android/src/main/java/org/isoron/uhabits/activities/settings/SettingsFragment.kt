@@ -34,7 +34,9 @@ import android.view.ViewGroup
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceDataStore
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
 import androidx.recyclerview.widget.RecyclerView
 import org.isoron.platform.time.DayOfWeek
 import org.isoron.platform.time.JavaLocalDateFormatter
@@ -60,6 +62,21 @@ class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeLis
     private var ringtoneManager: RingtoneManager? = null
     private lateinit var prefs: Preferences
     private var widgetUpdater: WidgetUpdater? = null
+    private val refreshTrackingSettings: () -> Unit = {
+        val app = requireContext().applicationContext as HabitsApplication
+        val storage = app.component.sharedPreferencesStorage
+        (findPreference("pref_midnight_delay") as SwitchPreferenceCompat).apply {
+            isPersistent = false
+            isChecked = storage.getBoolean(key, false)
+            isPersistent = true
+        }
+        (findPreference("pref_first_weekday") as ListPreference).apply {
+            isPersistent = false
+            value = (prefs.firstWeekday.daysSinceSunday + 1).toString()
+            updateWeekdayPreference()
+            isPersistent = true
+        }
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -89,6 +106,31 @@ class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeLis
         if (appContext is HabitsApplication) {
             prefs = appContext.component.preferences
             widgetUpdater = appContext.component.widgetUpdater
+            val storage = appContext.component.sharedPreferencesStorage
+            val trackingStore = object : PreferenceDataStore() {
+                override fun getBoolean(key: String?, defValue: Boolean) = storage.getBoolean(requireNotNull(key), defValue)
+                override fun getString(key: String?, defValue: String?) = storage.getString(requireNotNull(key), defValue ?: "")
+                override fun putBoolean(key: String?, value: Boolean) = storage.putBoolean(requireNotNull(key), value)
+                override fun putString(key: String?, value: String?) = storage.putString(requireNotNull(key), requireNotNull(value))
+            }
+            findPreference("pref_midnight_delay")?.preferenceDataStore = trackingStore
+            findPreference("pref_first_weekday")?.preferenceDataStore = trackingStore
+            refreshTrackingSettings()
+            for (key in listOf("pref_midnight_delay", "pref_first_weekday")) {
+                findPreference(key)?.setOnPreferenceChangeListener { _, value ->
+                    try {
+                        if (key == "pref_midnight_delay") {
+                            storage.putBoolean(key, value as Boolean)
+                        } else {
+                            storage.putString(key, value as String)
+                        }
+                        true
+                    } catch (error: org.isoron.uhabits.core.sync.PendingConflictException) {
+                        android.widget.Toast.makeText(requireContext(), error.message, android.widget.Toast.LENGTH_LONG).show()
+                        false
+                    }
+                }
+            }
         }
         setResultOnPreferenceClick("importData", RESULT_IMPORT_DATA)
         setResultOnPreferenceClick("exportCSV", RESULT_EXPORT_CSV)
@@ -102,6 +144,7 @@ class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeLis
     }
 
     override fun onPause() {
+        (requireContext().applicationContext as HabitsApplication).driveSync?.removeListener(refreshTrackingSettings)
         sharedPrefs!!.unregisterOnSharedPreferenceChangeListener(this)
         super.onPause()
     }
@@ -157,6 +200,7 @@ class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeLis
 
     override fun onResume() {
         super.onResume()
+        (requireContext().applicationContext as HabitsApplication).driveSync?.addListener(refreshTrackingSettings)
         ringtoneManager = RingtoneManager(requireActivity())
         sharedPrefs = preferenceManager.sharedPreferences
         sharedPrefs!!.registerOnSharedPreferenceChangeListener(this)

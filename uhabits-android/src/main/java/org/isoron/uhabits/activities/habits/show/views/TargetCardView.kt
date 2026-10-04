@@ -32,6 +32,9 @@ class TargetCardView(context: Context, attrs: AttributeSet) : LinearLayout(conte
     private val binding = ShowHabitTargetBinding.inflate(LayoutInflater.from(context), this)
     fun setState(state: TargetCardState) {
         val androidColor = state.theme.color(state.color).toInt()
+        binding.targetChart.contentDescription = state.intervals.mapIndexed { index, interval ->
+            "${intervalToLabel(resources, interval)}: ${state.values[index]} / ${state.targets[index]}"
+        }.joinToString("; ")
         binding.targetChart.setValues(state.values)
         binding.targetChart.setTargets(state.targets)
         binding.targetChart.setLabels(state.intervals.map { intervalToLabel(resources, it) })

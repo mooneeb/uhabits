@@ -36,6 +36,9 @@ class ScoreCardView(context: Context, attrs: AttributeSet) : LinearLayout(contex
         val androidColor = state.theme.color(state.color).toInt()
         binding.title.setTextColor(androidColor)
         binding.spinner.setSelection(state.spinnerPosition)
+        binding.scoreView.contentDescription = state.scores.take(16).joinToString("; ") {
+            "${it.date.toCSVString()}: ${it.value}"
+        }
         binding.scoreView.setScores(state.scores)
         binding.scoreView.reset()
         binding.scoreView.setBucketSize(state.bucketSize)

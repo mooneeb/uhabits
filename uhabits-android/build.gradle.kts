@@ -106,7 +106,7 @@ mokkery {
 }
 
 dependencies {
-    debugImplementation("com.google.android.gms:play-services-auth:22.0.0")
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.appIntro)
     implementation(libs.jsr305)

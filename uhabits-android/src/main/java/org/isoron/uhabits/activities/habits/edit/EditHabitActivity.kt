@@ -75,6 +75,7 @@ class EditHabitActivity : AppCompatActivity() {
     private lateinit var binding: ActivityEditHabitBinding
     private lateinit var commandRunner: CommandRunner
 
+    private var habitBaseline: Habit? = null
     var habitId = -1L
     lateinit var habitType: HabitType
     var unit = ""
@@ -104,6 +105,13 @@ class EditHabitActivity : AppCompatActivity() {
             binding.toolbar.title = getString(R.string.edit_habit)
             habitId = intent.getLongExtra("habitId", -1)
             val habit = component.habitList.getById(habitId)!!
+            habitBaseline = component.modelFactory.buildHabit().apply { copyFrom(habit) }
+            state?.getString("habitBaseline")?.let { content ->
+                org.isoron.uhabits.core.models.sqlite.SQLiteHabitList.copyTo(
+                    kotlinx.serialization.json.Json.decodeFromString<org.isoron.uhabits.core.database.HabitData>(content),
+                    habitBaseline!!
+                )
+            }
             habitType = habit.type
             color = habit.color
             freqNum = habit.frequency.numerator
@@ -267,7 +275,7 @@ class EditHabitActivity : AppCompatActivity() {
         var original: Habit? = null
         if (habitId >= 0) {
             original = component.habitList.getById(habitId)!!
-            habit.copyFrom(original)
+            habit.copyFrom(habitBaseline ?: original)
         }
 
         habit.name = binding.nameInput.text.trim().toString()
@@ -292,7 +300,8 @@ class EditHabitActivity : AppCompatActivity() {
             EditHabitCommand(
                 component.habitList,
                 habitId,
-                habit
+                habit,
+                habitBaseline
             )
         } else {
             CreateHabitCommand(
@@ -369,6 +378,15 @@ class EditHabitActivity : AppCompatActivity() {
     override fun onSaveInstanceState(state: Bundle) {
         super.onSaveInstanceState(state)
         with(state) {
+            habitBaseline?.let { baseline ->
+                putString(
+                    "habitBaseline",
+                    kotlinx.serialization.json.Json.encodeToString(
+                        org.isoron.uhabits.core.database.HabitData.serializer(),
+                        org.isoron.uhabits.core.models.sqlite.SQLiteHabitList.copyFrom(baseline)
+                    )
+                )
+            }
             putLong("habitId", habitId)
             putInt("habitType", habitType.value)
             putInt("paletteColor", color.paletteIndex)

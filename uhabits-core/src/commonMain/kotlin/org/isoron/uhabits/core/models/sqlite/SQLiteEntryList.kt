@@ -54,15 +54,13 @@ class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
         loadRecords()
         val habitId = habitId ?: throw IllegalStateException("habitId must be set")
 
-        repository.deleteByHabitIdAndTimestamp(habitId, entry.date.unixTime)
-
         val data = EntryData(
             habitId = habitId,
             timestamp = entry.date.unixTime,
             value = entry.value,
             notes = entry.notes
         )
-        repository.insert(data)
+        repository.replace(data)
 
         super.add(entry)
     }
@@ -77,7 +75,12 @@ class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
     }
 
     override fun clear() {
-        super.clear()
         repository.deleteByHabitId(habitId!!)
+        super.clear()
+    }
+
+    fun invalidate() {
+        super.clear()
+        isLoaded = false
     }
 }

@@ -36,6 +36,8 @@ import java.io.File
  * The Android application for Loop Habit Tracker.
  */
 class HabitsApplication : Application() {
+    var driveSync: org.isoron.uhabits.sync.GoogleDriveSync? = null
+        private set
 
     private lateinit var context: Context
     private lateinit var widgetUpdater: WidgetUpdater
@@ -89,6 +91,7 @@ class HabitsApplication : Application() {
             reminderScheduler.scheduleAll()
             widgetUpdater.updateWidgets()
         }
+        if (!isTestMode()) driveSync = org.isoron.uhabits.sync.GoogleDriveSync(this)
     }
 
     override fun onTerminate() {

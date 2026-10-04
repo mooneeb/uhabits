@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 case "${1:-help}" in
     build)
-        ./gradlew :uhabits-android:assembleDebug :uhabits-web:prepareDriveGate
+        ./gradlew --no-configure-on-demand :uhabits-android:assembleDebug :uhabits-web:prepareDriveGate
         ;;
     serve)
         if [[ ! -f uhabits-web/build/drive-gate/loop-core.js ]]; then

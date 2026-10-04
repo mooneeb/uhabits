@@ -11,7 +11,6 @@ pluginManagement {
     }
 }
 
-include(":uhabits-android", ":uhabits-core", ":uhabits-web")
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     repositories {
