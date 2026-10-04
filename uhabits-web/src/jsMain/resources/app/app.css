@@ -277,6 +277,12 @@ th.habit-name small {
 .settings button {
   margin-top: 14px;
 }
+.settings #update-app {
+  display: block;
+  width: fit-content;
+  margin-top: 14px;
+  padding: 12px 0;
+}
 .detail-meta {
   color: var(--muted);
   line-height: 1.6;

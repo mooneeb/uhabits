@@ -37,6 +37,9 @@ tasks.register<Copy>("prepareDriveGate") {
 kotlin {
     js(IR) {
         browser {
+            testTask {
+                useKarma { useChromeHeadless() }
+            }
             commonWebpackConfig {
                 outputFileName = "loop-core.js"
             }
@@ -47,6 +50,10 @@ kotlin {
         jsMain.dependencies {
             implementation(project(":uhabits-core"))
             implementation(libs.kotlinx.coroutines.core)
+        }
+        jsTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
