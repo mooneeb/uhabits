@@ -19,6 +19,7 @@
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization") version "2.3.20"
     alias(libs.plugins.ktlint.plugin)
     alias(libs.plugins.mokkery)
 }
@@ -42,6 +43,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("stdlib-common"))
                 implementation(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.serialization.json)
                 compileOnly(libs.kotlin.inject.runtime)
             }
         }

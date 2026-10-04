@@ -25,16 +25,18 @@ import org.isoron.uhabits.core.models.EntryList
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.models.ScoreList
 import org.isoron.uhabits.core.models.StreakList
+import org.isoron.uhabits.core.sync.SQLiteChangeStore
 
 /**
  * Factory that provides models backed by an SQLite database.
  */
 @Inject
 class SQLModelFactory(
-    val database: org.isoron.platform.io.Database
+    val database: org.isoron.platform.io.Database,
+    val changeStore: SQLiteChangeStore? = null
 ) : ModelFactory {
-    val habitRepository = HabitRepository(database)
-    val entryRepository = EntryRepository(database)
+    val habitRepository = HabitRepository(database, changeStore)
+    val entryRepository = EntryRepository(database, changeStore)
 
     override fun buildOriginalEntries() = SQLiteEntryList(entryRepository)
     override fun buildComputedEntries() = EntryList()

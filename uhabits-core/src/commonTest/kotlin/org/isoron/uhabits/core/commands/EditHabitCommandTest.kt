@@ -49,6 +49,18 @@ class EditHabitCommandTest : BaseUnitTest() {
     }
 
     @Test
+    fun savingDraftPreservesAnUnrelatedDownloadedChange() {
+        val baseline = fixtures.createEmptyHabit().apply { copyFrom(habit) }
+        val originalColor = habit.color
+        habit.color = org.isoron.uhabits.core.models.PaletteColor((originalColor.paletteIndex + 1) % 20)
+        val downloadedColor = habit.color
+        command = EditHabitCommand(habitList, habit.id!!, modified, baseline)
+        command.run()
+        assertEquals("modified", habit.name)
+        assertEquals(downloadedColor, habit.color)
+    }
+
+    @Test
     fun testExecute() {
         command = EditHabitCommand(habitList, habit.id!!, modified)
         val originalScore = habit.scores[today].value

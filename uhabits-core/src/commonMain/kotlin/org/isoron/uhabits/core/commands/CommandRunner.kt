@@ -20,6 +20,7 @@ package org.isoron.uhabits.core.commands
 
 import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.core.AppScope
+import org.isoron.uhabits.core.sync.PendingConflictException
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
 
@@ -33,11 +34,21 @@ open class CommandRunner(
     open fun run(command: Command) {
         taskRunner.execute(
             object : Task {
+                private var failure: PendingConflictException? = null
                 override suspend fun doInBackground() {
-                    command.run()
+                    try {
+                        command.run()
+                    } catch (error: PendingConflictException) {
+                        failure = error
+                    }
                 }
                 override fun onPostExecute() {
-                    notifyListeners(command)
+                    val error = failure
+                    if (error == null) {
+                        notifyListeners(command)
+                    } else {
+                        listeners.forEach { it.onCommandFailed(command, error.message ?: "Conflict requires resolution") }
+                    }
                 }
             }
         )
@@ -57,5 +68,6 @@ open class CommandRunner(
 
     interface Listener {
         fun onCommandFinished(command: Command)
+        fun onCommandFailed(command: Command, message: String) {}
     }
 }

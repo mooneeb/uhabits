@@ -36,6 +36,7 @@ import org.isoron.uhabits.core.models.sqlite.SQLiteHabitList
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.preferences.WidgetPreferences
 import org.isoron.uhabits.core.reminders.ReminderScheduler
+import org.isoron.uhabits.core.sync.SQLiteChangeStore
 import org.isoron.uhabits.core.tasks.CoroutineTaskRunner
 import org.isoron.uhabits.core.tasks.TaskRunner
 import org.isoron.uhabits.core.ui.NotificationTray
@@ -77,6 +78,7 @@ abstract class HabitsApplicationComponent(
     abstract val notificationTray: NotificationTray
     abstract val pendingIntentFactory: PendingIntentFactory
     abstract val preferences: Preferences
+    abstract val sharedPreferencesStorage: SharedPreferencesStorage
     abstract val reminderScheduler: ReminderScheduler
     abstract val reminderController: ReminderController
     abstract val taskRunner: TaskRunner
@@ -85,6 +87,8 @@ abstract class HabitsApplicationComponent(
 
     val db: AndroidDatabase
         get() = providedDb
+
+    val changeStore: SQLiteChangeStore by lazy { SQLiteChangeStore(providedDb) }
 
     private val providedDb: AndroidDatabase by lazy {
         AndroidDatabase(DatabaseUtils.openDatabase())
@@ -122,7 +126,7 @@ abstract class HabitsApplicationComponent(
 
     @AppScope
     @Provides
-    open fun modelFactory(): ModelFactory = SQLModelFactory(providedDb)
+    open fun modelFactory(): ModelFactory = SQLModelFactory(providedDb, if (org.isoron.uhabits.HabitsApplication.isTestMode()) null else changeStore)
 
     @AppScope
     @Provides

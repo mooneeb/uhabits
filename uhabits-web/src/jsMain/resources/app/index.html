@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#00897b" />
+    <title>Loop Habit Tracker</title>
+    <link rel="icon" href="icon-192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="app.css" />
+    <script src="../loop-core.js" defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="module" src="app.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./"><img src="icon-192.png" alt="" />Loop</a>
+      <nav aria-label="Main navigation">
+        <button data-page="habits" aria-current="page">Habits</button
+        ><button data-page="archived">Archived</button
+        ><button data-page="settings">Settings</button>
+      </nav>
+      <button id="connect">Connect Google Drive</button>
+    </header>
+    <main>
+      <div class="save-status">
+        <p id="save-status" role="status" aria-live="polite">
+          Opening saved habits…
+        </p>
+        <p id="sync-status" role="status" aria-live="polite">Local device</p>
+        <button id="sync">Sync now</button
+        ><button id="install" hidden>Install Loop</button>
+      </div>
+      <p id="test-workspace" hidden></p>
+      <details id="test-tools" hidden>
+        <summary>Test workspace cleanup</summary>
+        <p>
+          Stop the synthetic Android client first. This removes only this test's
+          Drive files and retains local test data.
+        </p>
+        <form id="test-cleanup-form">
+          <label
+            >Confirm the test UUID
+            <input id="cleanup-confirm" name="run" required autocomplete="off"
+          /></label>
+          <button id="cleanup-test">Delete this test's Drive files</button>
+        </form>
+      </details>
+      <section id="habits-page" aria-label="Habits">
+        <div class="heading">
+          <h1 id="list-title">Habits</h1>
+          <button id="new-habit" class="primary">＋ New habit</button>
+        </div>
+        <div class="filters">
+          <label
+            >Search
+            <input
+              id="search"
+              type="search"
+              placeholder="Find a habit" /></label
+          ><label
+            >Sort
+            <select id="sort">
+              <option value="manual">Manual order</option>
+              <option value="name">Name</option>
+              <option value="color">Color</option>
+              <option value="score">Strength</option>
+              <option value="status">Today’s status</option>
+            </select></label
+          ><label class="check"
+            ><input type="checkbox" id="hide-completed" />Hide completed</label
+          ><button id="earlier">← Earlier</button
+          ><button id="today">Today</button>
+        </div>
+        <div id="habit-list"></div>
+      </section>
+      <section id="detail-page" hidden></section>
+      <section id="settings-page" hidden>
+        <h1>Settings</h1>
+        <form id="settings-form" class="card settings">
+          <h2>Shared tracking settings</h2>
+          <label
+            >Day starts at
+            <select name="dayStart">
+              <option value="0">Midnight</option>
+              <option value="3">3 a.m.</option>
+            </select></label
+          ><label
+            >Week starts on
+            <select name="weekStart">
+              <option value="1">Sunday</option>
+              <option value="2">Monday</option>
+              <option value="3">Tuesday</option>
+              <option value="4">Wednesday</option>
+              <option value="5">Thursday</option>
+              <option value="6">Friday</option>
+              <option value="7">Saturday</option>
+            </select></label
+          >
+          <p>
+            Entries keep the date you recorded. Today follows this device’s
+            local time.
+          </p>
+          <button class="primary">Save tracking settings</button>
+        </form>
+        <div class="card settings">
+          <h2>This device</h2>
+          <label
+            >Appearance
+            <select id="theme">
+              <option value="system">Follow system</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select></label
+          >
+          <p>
+            Your saved habits remain available when you reopen this installed
+            app offline. Google authorization may need reconnecting when you’re
+            online.
+          </p>
+        </div>
+      </section>
+      <section
+        id="conflicts"
+        class="card"
+        hidden
+        aria-label="Competing revisions"
+      ></section>
+    </main>
+    <dialog id="habit-dialog">
+      <form id="habit-form">
+        <div class="heading">
+          <h2 id="habit-dialog-title">New habit</h2>
+          <button
+            type="button"
+            data-close="habit-dialog"
+            aria-label="Close habit editor"
+          >
+            ✕
+          </button>
+        </div>
+        <input type="hidden" name="uuid" /><label
+          >Name
+          <input
+            name="name"
+            required
+            maxlength="1000"
+            autocomplete="off" /></label
+        ><label
+          >Question
+          <input
+            name="question"
+            maxlength="10000"
+            placeholder="Did you…?" /></label
+        ><label
+          >Description
+          <textarea name="description" maxlength="10000"></textarea>
+        </label>
+        <div class="form-row">
+          <label
+            >Color
+            <select name="color"></select></label
+          ><label
+            >Tracking
+            <select name="type">
+              <option value="0">Yes / no</option>
+              <option value="1">Numeric</option>
+            </select></label
+          >
+        </div>
+        <div class="form-row">
+          <label
+            >Times
+            <input
+              name="freqNum"
+              type="number"
+              value="1"
+              min="1"
+              max="1000000"
+              required /></label
+          ><label
+            >Per days
+            <input
+              name="freqDen"
+              type="number"
+              value="1"
+              min="1"
+              max="1000000"
+              required
+          /></label>
+        </div>
+        <div id="numeric-settings">
+          <div class="form-row">
+            <label
+              >Target
+              <input
+                name="targetValue"
+                type="number"
+                value="0"
+                min="0"
+                max="2147483.647"
+                step="0.001" /></label
+            ><label
+              >Target rule
+              <select name="targetType">
+                <option value="0">At least</option>
+                <option value="1">At most</option>
+              </select></label
+            >
+          </div>
+          <label
+            >Unit
+            <input
+              name="unit"
+              maxlength="1000"
+              placeholder="km, minutes, pages…"
+          /></label>
+        </div>
+        <fieldset>
+          <legend>Android reminder</legend>
+          <label class="check"
+            ><input name="reminderEnabled" type="checkbox" />Enable
+            reminder</label
+          >
+          <div class="form-row">
+            <label
+              >Time
+              <input name="reminderTime" type="time" value="08:00" /></label
+            ><label
+              >Days
+              <select name="reminderDays">
+                <option value="127">Every day</option>
+                <option value="62">Weekdays</option>
+                <option value="65">Weekends</option>
+              </select></label
+            >
+          </div>
+        </fieldset>
+        <p class="form-error" role="alert"></p>
+        <button class="primary">Save habit</button>
+      </form>
+    </dialog>
+    <dialog id="entry-dialog">
+      <form id="entry-form">
+        <div class="heading">
+          <h2 id="entry-title">Record a day</h2>
+          <button
+            type="button"
+            data-close="entry-dialog"
+            aria-label="Close entry editor"
+          >
+            ✕
+          </button>
+        </div>
+        <input name="uuid" type="hidden" /><label
+          >Date
+          <input name="date" type="date" required min="1900-01-01" /></label
+        ><label
+          >Outcome
+          <select name="outcome"></select></label
+        ><label id="amount-label"
+          >Amount
+          <input
+            name="amount"
+            type="number"
+            min="0"
+            max="2147483.647"
+            step="0.001" /></label
+        ><label
+          >Entry notes
+          <textarea
+            name="notes"
+            maxlength="10000"
+            placeholder="Notes for this day"
+          ></textarea>
+        </label>
+        <p class="form-error" role="alert"></p>
+        <button class="primary">Save entry</button>
+      </form>
+    </dialog>
+  </body>
+</html>

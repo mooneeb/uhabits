@@ -5,7 +5,9 @@ import org.isoron.platform.io.PreparedStatement
 import org.isoron.platform.io.StepResult
 import org.isoron.platform.io.queryLong
 import org.isoron.platform.io.run
+import org.isoron.uhabits.core.sync.SQLiteChangeStore
 
+@kotlinx.serialization.Serializable
 data class HabitData(
     var id: Long? = null,
     var name: String = "",
@@ -27,7 +29,7 @@ data class HabitData(
     var uuid: String? = null
 )
 
-class HabitRepository(private val db: Database) {
+class HabitRepository(private val db: Database, private val changeStore: SQLiteChangeStore? = null) {
     private val findAllStmt by lazy {
         db.prepareStatement(
             """SELECT id, name, description, question, freq_num, freq_den, color,
@@ -77,7 +79,9 @@ class HabitRepository(private val db: Database) {
         return results
     }
 
-    fun insert(data: HabitData): Long {
+    fun insert(data: HabitData): Long = mutate { insertRaw(data) }
+
+    private fun insertRaw(data: HabitData): Long {
         if (data.id != null) {
             insertWithIdStmt.reset()
             insertWithIdStmt.bindLong(1, data.id!!)
@@ -91,22 +95,24 @@ class HabitRepository(private val db: Database) {
         return db.queryLong("SELECT last_insert_rowid()")
     }
 
-    fun update(data: HabitData) {
+    fun update(data: HabitData) = mutate {
         updateStmt.reset()
         bindForInsert(updateStmt, data)
         updateStmt.bindLong(18, data.id!!)
         updateStmt.step()
     }
 
-    fun delete(id: Long) {
+    fun delete(id: Long) = mutate {
         deleteStmt.reset()
         deleteStmt.bindLong(1, id)
         deleteStmt.step()
     }
 
-    fun execSQL(sql: String) = db.run(sql)
+    fun execSQL(sql: String) = mutate { db.run(sql) }
 
-    fun execSQL(sql: String, bind: PreparedStatement.() -> Unit) = db.run(sql, bind)
+    fun execSQL(sql: String, bind: PreparedStatement.() -> Unit) = mutate { db.run(sql, bind) }
+
+    private fun <T> mutate(action: () -> T): T = changeStore?.captureHabits(action) ?: action()
 
     private fun bindForInsert(stmt: PreparedStatement, data: HabitData, offset: Int = 0) {
         val o = offset

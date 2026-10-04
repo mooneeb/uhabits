@@ -21,6 +21,7 @@ ksp = "2.3.6"
 ktlint-plugin = "11.6.1"
 ktor = "1.6.8"
 ktxCoroutine = "1.10.1"
+serialization = "1.11.0"
 legacy-support = "1.0.0"
 material = "1.12.0"
 mokkery = "3.3.0"
@@ -32,6 +33,7 @@ uiautomator = "2.3.0"
 documentfile = "1.0.1"
 
 [libraries]
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
 appIntro = { group = "com.github.AppIntro", name = "AppIntro", version.ref = "appintro" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

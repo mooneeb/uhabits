@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loop — Drive integration gate</title>
+  <link rel="stylesheet" href="gate.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="loop-core.js" defer></script>
+  <script type="module" src="gate.mjs"></script>
+</head>
+<body>
+  <main>
+    <h1>Loop · Drive integration gate</h1>
+    <p>This development harness proves Android and web can exchange isolated synthetic records. Issue #2 remains incomplete until the actual habit workflows pass.</p>
+    <label>Web OAuth client ID <input id="client-id" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
+    <label>Test run UUID <input id="run-id" autocomplete="off"></label>
+    <button id="new-run">New test run</button>
+    <button id="connect">Connect Google Drive</button>
+    <label>Numeric amount <input id="amount" type="number" value="12.345" step="0.001" min="0" max="2147483.647"></label>
+    <label>Entry notes <textarea id="notes">Synthetic entry notes — آزمائش</textarea></label>
+    <button id="publish" disabled>Publish browser sample</button>
+    <button id="discover" disabled>Discover this run</button>
+    <button id="measure" disabled>Measure bundled discovery</button>
+    <button id="cleanup" disabled>Delete this run’s synthetic samples</button>
+    <p id="status" role="status" aria-live="polite">Live environment unavailable: connect an OAuth client to run the gate.</p>
+    <pre id="results" tabindex="0" aria-label="Integration evidence"></pre>
+  </main>
+</body>
+</html>

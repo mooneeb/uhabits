@@ -56,8 +56,8 @@ class NumberDialog : AppCompatDialogFragment() {
         view.notes.setText(originalNotes)
         view.value.setText(
             when {
-                originalValue < 0.01 -> "0"
-                else -> DecimalFormat("#.##").format(originalValue)
+                originalValue < 0.0 || originalValue == Entry.SKIP.toDouble() / 1000 -> "0"
+                else -> DecimalFormat("0.###").format(originalValue)
             }
         )
         view.value.setOnKeyListener { _, keyCode, event ->

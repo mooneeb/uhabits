@@ -106,6 +106,7 @@ mokkery {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.appIntro)
     implementation(libs.jsr305)
@@ -140,4 +141,5 @@ dependencies {
 
     testImplementation(libs.kotlin.inject.runtime)
     testImplementation(libs.junit.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

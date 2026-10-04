@@ -26,6 +26,6 @@ data class DeleteHabitsCommand(
     val selected: List<Habit>
 ) : Command {
     override fun run() {
-        for (h in selected) habitList.remove(h)
+        habitList.remove(selected)
     }
 }

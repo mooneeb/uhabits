@@ -23,9 +23,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
 import me.tatarka.inject.annotations.Inject
+import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
 import org.isoron.uhabits.core.AppScope
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.sync.RegisterValues
 import org.isoron.uhabits.inject.AppContext
 
 @Inject
@@ -38,6 +40,8 @@ class SharedPreferencesStorage(
         PreferenceManager.getDefaultSharedPreferences(context)
 
     private var preferences: Preferences? = null
+    private val appContext = context.applicationContext
+    private val changeStore get() = if (HabitsApplication.isTestMode()) null else (appContext as HabitsApplication).component.changeStore
 
     init {
         sharedPrefs.registerOnSharedPreferenceChangeListener(this)
@@ -46,8 +50,10 @@ class SharedPreferencesStorage(
 
     override fun clear() = sharedPrefs.edit().clear().apply()
 
-    override fun getBoolean(key: String, defValue: Boolean) =
-        sharedPrefs.getBoolean(key, defValue)
+    override fun getBoolean(key: String, defValue: Boolean): Boolean {
+        if (key == "pref_midnight_delay") changeStore?.history()?.value("setting:dayStart")?.let { return RegisterValues.number(it) == 3 }
+        return sharedPrefs.getBoolean(key, defValue)
+    }
 
     override fun getInt(key: String, defValue: Int) =
         sharedPrefs.getInt(key, defValue)
@@ -55,15 +61,19 @@ class SharedPreferencesStorage(
     override fun getLong(key: String, defValue: Long) =
         sharedPrefs.getLong(key, defValue)
 
-    override fun getString(key: String, defValue: String): String =
-        sharedPrefs.getString(key, defValue)!!
+    override fun getString(key: String, defValue: String): String {
+        if (key == "pref_first_weekday") changeStore?.history()?.value("setting:weekStart")?.let { return RegisterValues.number(it).toString() }
+        return sharedPrefs.getString(key, defValue)!!
+    }
 
     override fun onAttached(preferences: Preferences) {
         this.preferences = preferences
     }
 
-    override fun putBoolean(key: String, value: Boolean) =
+    override fun putBoolean(key: String, value: Boolean) {
+        if (key == "pref_midnight_delay") changeStore?.updateSetting("dayStart", if (value) 3 else 0)
         sharedPrefs.edit().putBoolean(key, value).apply()
+    }
 
     override fun putInt(key: String, value: Int) =
         sharedPrefs.edit().putInt(key, value).apply()
@@ -71,8 +81,10 @@ class SharedPreferencesStorage(
     override fun putLong(key: String, value: Long) =
         sharedPrefs.edit().putLong(key, value).apply()
 
-    override fun putString(key: String, value: String) =
+    override fun putString(key: String, value: String) {
+        if (key == "pref_first_weekday" && value.toIntOrNull() in 1..7) changeStore?.updateSetting("weekStart", value.toInt())
         sharedPrefs.edit().putString(key, value).apply()
+    }
 
     override fun remove(key: String) =
         sharedPrefs.edit().remove(key).apply()
