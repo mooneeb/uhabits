@@ -3,7 +3,8 @@
 The public PWA is a static shell. Habit histories, dates, notes, conflicts and
 recovery records stay in each device and Google Drive's private app-data folder.
 Nginx and Cloudflare hold no Google access or refresh tokens. Temporary sessions
-use memory and never connect Drive or write the owned browser workspace.
+keep tracking data and tokens in memory, connect directly to Drive while authorized,
+and never write the owned browser workspace.
 
 ## Owner signing key and OAuth
 
@@ -44,15 +45,15 @@ source "$HOME/.local/share/loop-release/signing.env"
 set +a
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools
-export LOOP_VERSION_CODE=20303
-export LOOP_VERSION_NAME=2.3.3-personal
+export LOOP_VERSION_CODE=20311
+export LOOP_VERSION_NAME=2.3.11-personal
 export LOOP_WEB_CLIENT_ID=436833216636-ehkfmi2pi45qosum1pm96v5v4g2kucen.apps.googleusercontent.com
-export LOOP_PWA_IMAGE=your-registry/loop-pwa:20303
+export LOOP_PWA_IMAGE=your-registry/loop-pwa:20311
 export LOOP_SIGNER_SHA256=8d398b7b5610dcb480b6334f3da49798629e29eeb0aa1517d6ce9d10a2792354
 scripts/release.sh
 ```
 
-The script verifies the expected signer and produces `build/release/20303/` with
+The script verifies the expected signer and produces `build/release/20311/` with
 APK, complete static site, Dockerfile, Kubernetes manifests and SHA-256 checksums.
 Existing release directories are preserved. Build from a clean committed tree
 so the recorded source commit identifies the artifact source. Build/push the
@@ -74,12 +75,12 @@ directory, avoiding a local image build and privileged Docker socket:
 python3 scripts/package-pwa.py \
   --web-client-id "$LOOP_WEB_CLIENT_ID" \
   --image nginxinc/nginx-unprivileged:1.28.0-alpine \
-  --site-dir /home/moon/loop-pwa/20303/site --node homeserver \
-  --output build/release/20303/homeserver
-ssh moon@homeserver 'mkdir -p /home/moon/loop-pwa/20303'
-scp -r build/release/20303/homeserver/site \
-  build/release/20303/homeserver/kubernetes moon@homeserver:/home/moon/loop-pwa/20303/
-ssh moon@homeserver 'export KUBECONFIG="$HOME/.kube/config"; chmod -R a+rX /home/moon/loop-pwa/20303; kubectl apply -k /home/moon/loop-pwa/20303/kubernetes; kubectl rollout status -n habits deployment/loop-pwa'
+  --site-dir /home/moon/loop-pwa/20311/site --node homeserver \
+  --output build/release/20311/homeserver
+ssh moon@homeserver 'mkdir -p /home/moon/loop-pwa/20311'
+scp -r build/release/20311/homeserver/site \
+  build/release/20311/homeserver/kubernetes moon@homeserver:/home/moon/loop-pwa/20311/
+ssh moon@homeserver 'export KUBECONFIG="$HOME/.kube/config"; chmod -R a+rX /home/moon/loop-pwa/20311; kubectl apply -k /home/moon/loop-pwa/20311/kubernetes; kubectl rollout status -n habits deployment/loop-pwa'
 ```
 
 Keep older asset directories. Roll back by applying the previous release's

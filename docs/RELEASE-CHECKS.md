@@ -1,118 +1,101 @@
 # Issue #4 release checks
 
-Recorded 2026-10-04. Issue #4 remains open until the deployed-PWA/signed-Android
-and complete parent acceptance procedures pass. The supporting tests below are
-not a claim that those live journeys passed.
+Recorded 2026-10-05. Issue #4 and parent #1 remain open while the complete parent
+acceptance matrix is being finished. Supporting tests do not replace live
+signed Android / public PWA acceptance.
 
-## Confirmed
+## Environment and release
 
-- SSH key access to `moon@homeserver` works. Remote kubeconfig
-  `~/.kube/config`, context `default`, node `homeserver` is Ready.
-- Static PWA release 20302 runs as Deployment `habits/loop-pwa` (1/1 ready).
-  HTTPRoute `habits/habits` is Accepted and ResolvedRefs on `gateway/main`.
-  HTTPS `/healthz` returns `ok` through the Tailscale gateway with its wildcard
-  certificate. Its versioned static site is `/home/moon/loop-pwa/20302/site`.
-- APK 20302 was built and `apksigner verify --print-certs` confirms the stable
-  owner SHA-256 fingerprint documented in RELEASE.md. This is signature/build
-  evidence; signed Google authorization has not yet been verified.
-- The real retained native debug installation authorized the test Google account,
-  reached `Synchronized with Drive · 0 pending`, and persisted network-required
-  JobScheduler job 7401. Forcing that OS job first exposed an expired token;
-  foreground Connect recovered authorization and reconciled. This does not yet
-  prove a remote edit was applied by a normal unattended scheduled job.
-- The real browser PWA imported a six-column HabitBull CSV through its import
-  form. `Release Import` has dated value `12` on 2026-10-01 and its dated note.
-  The UI reported a durable local import and pending reconnect. After the shell update, the browser
-  durable upload watermark advanced to the import envelope (sequence 48).
-  A native UI confirmation of this imported record is still pending.
-- The real browser `/update/` recovery page refreshed a retained earlier shell.
-  Existing Boolean/numeric habits, original entries and the new imported record
-  remain displayed; no site storage was cleared.
-- Seven Node transport/storage checks pass: temporary isolation, purge cleanup
-  interruption, duplicate upload retry after lost response, clock-skew conflicts
-  and deletion/purge cases.
-- Focused JVM checks pass for staged external imports/malformed rejection,
-  original-entry CSV precision, restore conflicts/independent later work,
-  deletion/purge barriers, third-replica import delivery, durable SQLite pending
-  imports and reminder weekday/cancellation/snooze behavior. A new numeric CSV
-  regression failed before its fix and passed after it.
+- Public HTTPS: https://habits.mooneeb.dev/app/, dedicated Cloudflare Tunnel
+  `loop-habits`, Kubernetes namespace `habits`, Deployment `loop-pwa`.
+  `moon@homeserver`, remote kubeconfig `~/.kube/config`, context `default`.
+  Versioned read-only assets: `/home/moon/loop-pwa/20310/site`.
+- Owner-signed APK 20310, source `7dc7a5b5`, artifact
+  `build/release/20310/Loop-20310.apk`. Signature verified against the retained
+  owner certificate in RELEASE.md. Native and public static releases match.
+- Actual Google consent and private Drive interoperability passed using the
+  dedicated account `m.mooneeb.h@gmail.com`, project `loop-habit-510612`, native
+  Google Play API 36 emulator `loop-owner-release-api36` (`emulator-5556`), and
+  desktop Chromium through the T3 preview. No credentials/tokens were injected.
+- Public routing, signed Android OAuth registration and owner SSH access are
+  working. Earlier missing prerequisites are resolved.
 
-## Unavailable live prerequisites
+## Live signed/public results
 
-- Initial Cloudflare setup found no `habits.mooneeb.dev` DNS record. The lab certificate
-  token can read tunnel metadata but tunnel creation returned HTTP 403. A token
-  with Cloudflare Tunnel Edit and DNS Edit (or owner dashboard setup) is required
-  for the dedicated public tunnel. The owner supplied a new local API token. A dedicated `loop-habits` tunnel
-  was created and connected (four QUIC connections); proxied CNAME and the
-  Kubernetes tunnel deployment now provide public HTTPS. `/healthz` returns
-  HTTP 200. The initial missing-permission prerequisite is resolved.
-- The owner confirmed Google Cloud registration of the public web origin and
-  stable release certificate. Real consent and transport verification remain pending. The debug OAuth client is not sufficient for the
-  signed APK. Owner interaction is also needed to complete Google consent on a
-  fresh signed test installation and in the browser; no tokens were injected.
-- T3 preview clicks have not exposed a Google chooser. Preview snapshot currently
-  reports an automation error; focused evaluation can inspect the app. Android
-  Chrome/native UI inspection also encountered a UIAutomator idle timeout.
+| Journey | Observed result |
+| --- | --- |
+| Bidirectional entries | Public Boolean completion and multiline note reached signed Android; native numeric 12.345 and note reached public PWA. Later 34.567 and independent 1.234 notes retained full precision. |
+| Native widget offline | Home-screen Checkmark widget changed Browser Walk offline. One pending change survived same-key APK upgrade/restart and reached the public PWA after reconnect, preserving the note. |
+| Reminder weekdays | Public 00:54 Mon/Wed/Sat configured the native exact alarm and delivered the actual notification. Its No action propagated as Missed with the existing note. |
+| Modern notification snooze | Release 20309 showed Yes/No/Later on API 36. Later opened the actual custom clock picker; 01:35 snooze persisted. Public removal of Monday left Wed/Sat, yet the stored Monday snooze delivered after process death. Actual Yes reached public Completed with its dated note. |
+| Reminder disable | Public disable propagated as null reminder in native full backup; the future 01:28 regular alarm and 01:35 snooze were absent afterward. |
+| Background update | Native Home/process death followed by public rename to Release Background Walk updated the home-screen widget before the native app reopened. The normal pending-action job 7402 reconciled it. Periodic job 7401 also ran naturally; this rename is not attributed specifically to 7401. |
+| Supported imports | Actual public forms imported Loop, Rewire and Tickmate database fixtures and HabitBull CSV; resulting definitions/history reached signed native UI/full backup. |
+| Older restore | Actual native Settings import of an older causal JSON exposed 12.345 versus newer 34.567 instead of overwriting. Independent earlier-date 1.234 and its multiline note survived. Native explicit Keep 34.567 converged in both clients. |
+| Recovery and purge | Native deletion and explicit purge propagated. A real stale pre-lifecycle JSON import in the public PWA retained the permanent purge barrier with no purged UUID payload. Recoverable deletion remained until explicit public Restore; the restored habit reappeared natively. Extra ordering/reminder conflicts from the old restore were explicitly resolved. |
+| Malformed inputs | Public malformed JSON, unsupported backup version, invalid February-30 CSV and Loop database entry with null date produced actionable errors. Full exports before/after malformed database were byte-identical. A valid later import/export worked after failed JSON import. |
+| CSV/full backup | Actual native exports and public CSV/causal JSON exports preserved raw original entries, three-decimal amounts, multiline dated notes and purge/recovery history. Native files retained in ignored build artifacts. |
+| Signed upgrade | Offline 20305 → 20309 `adb install -r`, same owner key: pending widget edit, numeric conflict, recoverable deletion and purge barrier all retained. Reconnect uploaded the pending edit. 20310 installation also retained data and account. |
+| Public shell update | Actual update-page button preserved a 25,837-byte full backup byte-for-byte. Another update preserved one pending dated Skip/note and its 26,428-byte full backup; owner reconnect uploaded it and native received the Skip/note. HTTP refresh now includes CSS. |
+| Delete-versus-edit | Native offline rename and installed-PWA offline deletion produced a deletion conflict in both clients. Native explicit Keep false retained the renamed habit; desktop reached Synchronized with Drive with no conflicts. |
+| Fresh third replica | Public importing client was navigated to the update page and native was stopped. Fresh Android Chrome authorized the same test account and downloaded all imported/later history. Its actual exported 54,688-byte full backup exactly matched the original public export: 57 envelopes and the permanent purge barrier. |
+| Installed public PWA offline | Android Chrome installed WebAPK `org.chromium.webapk.aabb6ce3a360002e6_v2`. With Wi-Fi/mobile disabled, cold launcher open retained habits. Offline 9.876/note survived another force-stop/cold launch with one pending change. Signed native 7.123/distinct note separately survived offline restart. After reconnect both actual clients preserved competing 7.123/native and 9.876/installed-PWA versions with distinct notes. Native explicit Keep 9.876 reached desktop with its note; the independent earlier-date 1.234 remained. |
+| Flexible habits/statistics | Public numeric at-most 2.5 cups, 3/7 frequency, historical 1.234 and dated multiline note reached signed Android. Both displayed 100% strength and week/month/quarter/year totals/targets 1.234/2.5, /10, /32.5, /130. Native 3-times-per-week Boolean creation and October-4 calendar completion reached the public grid. |
+| Independent definition edits | Native editor rename/description and public color edit retained both after Drive reconciliation. Dated note remained separate from the description. |
+| Archive/reactivation and navigation | Public archive hid the numeric habit from native active list. Native Unarchive returned it to the public grid with its 1.234 record/note. Public search/name-sort/filter behaved as expected, and manual move propagated. Day/week/month/quarter/year graph periods and expandable values rendered. |
+| Shared settings | Public 3 a.m. day start selected October 4 before 3 a.m. October 5. Native Settings showed delayed day start enabled and Sunday week start. Native Monday selection then reached public Settings; public midnight selection returned the grid to October 5. Existing October-5 and older records retained their dates. |
 
-## Remaining real acceptance
+Screenshots and actual exported fixtures are in ignored `build/issue-4-*` files.
+Notable captures: `issue-4-upgrade-before.png`, `issue-4-upgrade-after.png`,
+`issue-4-off-weekday-snooze-delivery.png`, `issue-4-widget-background-later.png`.
+Native exports: `issue-4-signed-snooze-complete.loop.json`,
+`issue-4-signed-csv.zip`. These are synthetic dedicated-account fixtures.
 
-Follow RELEASE.md's numbered procedure and parent issue #1. Specifically still
-unproven on the public deployed shell and signed APK: reminder delivery/custom
-weekdays/disable/snooze, widget and notification quick actions through Drive,
-normal permitted background propagation, import/older-restore reconciliation
-through Drive, and same-key APK upgrades preserving all recovery/conflict/purge
-and pending states. The retained debug/local-shell observations and shared-core
-regressions support these behaviors but do not replace the signed deployed checks.
+## Discovery cost validation
 
-## Test runner notes
+Before the purge fix, the actual public client downloaded 620 package bodies in
+658.7 seconds (642 Drive API requests) and continuously displayed Synchronizing.
+Both clients now acknowledge a complete purge scan only after successful cleanup,
+then discover unknown bodies incrementally while still checking all metadata for
+late stale payloads. The public first successful 20310 cycle downloaded 31 bodies;
+the next observed automatic cycle listed metadata with zero body downloads and
+showed Synchronized with Drive. A subsequent idle window of 95.3 seconds made four metadata requests and zero body downloads, with Synchronized with Drive displayed.
+Native 20310 reached Synchronized with Drive, zero pending.
 
-The full JVM and Android unit tasks completed without reported failures before
-the browser task. The full JS ChromeHeadless run hit the previously documented
-`CanvasTest.testDrawTestImage` rendering failure, then browser disconnection and
-no-activity timeouts. It was stopped after repeated disconnects, so the full JS
-suite is not reported as passing. The final full JVM run and Android unit run passed; focused JS portability/sync
-tests also passed. Their counts are recorded below.
+## Remaining complete-parent acceptance
 
-Final supporting test results: 312 JVM tests, 5 Android unit tests, 43 focused
-JS sync/import tests and 7 Node tests passed, with no failures in those runs.
+Continue on the signed/public release: travel-date preservation,  temporary authorized save/end/storage isolation,  account-switch rejection with pending work,
+and temporary/account boundary checks.
+Prior debug/local issue #2/#3 evidence is in tracking-workflows.md and
+reliability-workflows.md; it does not silently count as signed/public completion.
+
+## Supporting checks
+
+Latest purge/quick-action change validation: 316 JVM tests and 5 Android unit tests,
+20 focused core JS tests, one web facade browser regression, and 10 Node checks
+passed. Earlier focused portability/sync JS runs also passed. Logs:
+`build/issue-4-discovery-validation.log`,
+`build/issue-4-discovery-js-validation.log`,
+`build/issue-4-discovery-node.log`, `build/issue-4-release-20310.log`.
+
+The full JS run hit the previously documented unchanged
+`CanvasTest.testDrawTestImage` reference-render failure, then browser disconnects
+and no-activity timeouts. It was stopped; the full JS suite is not reported as
+passing. Versioned release build and owner signature verification passed.
 
 ## Code review
 
 ### Standards
 
-Zero documented-standard violations and one initial heuristic finding: the
-backup export task reached through a global application component. The task now
-receives its SQLite change store through the existing injected factory.
+Review against owner-confirmed `ed95237`: no remaining documented-standard or
+meaningful heuristic violation. Initial global-component reach-through in backup
+export was replaced by injection through the existing factory.
 
 ### Spec
 
-Three code findings were fixed: zero-weekday reminder scheduling now
-cancels safely; custom clock snoozes persist and survive scheduling refreshes;
-malformed source database rows are rejected instead of skipped or date-normalized.
-New regressions cover all three supported database formats and custom/off-weekday
-snooze persistence. Required signed/public live acceptance remains pending as
-recorded above; no material scope creep was found.
-
-Review totals: Standards 1 heuristic (resolved), 0 hard violations; Spec 3 code
-findings (resolved) and 1 remaining live-acceptance gap. The worst remaining Spec
-issue is the unavailable signed/public end-to-end verification.
-
-Public browser startup caught a deployment MIME issue: stock nginx served `.mjs`
-modules as application/octet-stream. The release nginx config now explicitly
-serves `.mjs` as JavaScript, preserving the standard MIME mappings for other assets.
-
-Public release 20304 is now deployed at https://habits.mooneeb.dev/app/.
-HTTP checks pass for health, app HTML, JavaScript modules, SQLite WASM, migrations,
-temporary session and update page. The real public browser initializes the
-tracker and durable local workspace. An explicit reload was needed for the
-browser’s earlier MIME response cache; the update page now refreshes the HTTP
-cache before replacing the owned shell. Google Connect opens a consent popup,
-but completing that interactive consent remains pending.
-
-Final signed artifact: `build/release/20304/Loop-20304.apk`, source commit
-`f05f63e2`, verified owner signer. The build passes with the pinned R8 and
-without the earlier Kotlin metadata parsing errors.
-
-Follow-up review of `f05f63e2`: Standards reports zero remaining hard or heuristic
-findings; Spec confirms all three code defects are resolved, with the live
-acceptance gap remaining. No material scope creep or new defect was found.
+Resolved findings: zero-weekday cancellation, persisted custom snooze, malformed
+source database rejection, quick-action receiver lifetime through durable save,
+and purge discovery repeatedly downloading unchanged history. Both parallel
+reviewers confirmed the final purge fix, including retry/new-barrier handling.
+No material scope creep found. One remaining acceptance gap is the unfinished
+complete-parent signed/public matrix above; no issue is closed on test counts.

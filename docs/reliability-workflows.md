@@ -4,7 +4,7 @@ Both clients use causal revisions: ordinary edits merge independent values; inco
 
 Deleted habits appear in Recovery with their definition and dated history. Restore retains the UUID. Purge requires deletion and resolution of all known conflicts for that habit. History format 2 removes the habit's payloads and keeps a permanent identity barrier plus the causal envelopes needed for delivery and acknowledgement. Format 1 packs remain readable; old clients reject format 2, so update both clients together. ADR 0004 remains a proposal.
 
-Drive cleanup publishes complete redacted histories before deleting old packages containing purged payloads. An interrupted cleanup retries; a disconnected replica can retain its own old payload until reconnect. Every sync after a purge scans all workspace revisions to remove newly arriving stale payloads. This trades additional discovery work for reliable removal; the existing 10 MB per-package limit remains.
+Drive cleanup publishes complete redacted histories before deleting old packages containing purged payloads. An interrupted cleanup retries; a disconnected replica can retain its own old payload until reconnect. After a new purge, both clients scan the existing workspace once and acknowledge that scan only after cleanup succeeds. Later syncs continue listing workspace metadata to detect newly arriving stale payloads, while downloading only unknown packages. Failed cleanup remains unacknowledged and retries. The existing 10 MB per-package limit remains.
 
 ## Temporary and owned browser sessions
 
