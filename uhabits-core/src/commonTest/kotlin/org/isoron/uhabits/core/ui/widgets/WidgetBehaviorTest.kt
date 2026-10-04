@@ -23,17 +23,25 @@ import dev.mokkery.every
 import dev.mokkery.mock
 import dev.mokkery.resetCalls
 import dev.mokkery.verify
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
+import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Entry.Companion.nextToggleValue
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.tasks.CoroutineTaskRunner
 import org.isoron.uhabits.core.ui.NotificationTray
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import dev.mokkery.verify.VerifyMode.Companion.not as notCalled
 
 class WidgetBehaviorTest : BaseUnitTest() {
@@ -77,6 +85,23 @@ class WidgetBehaviorTest : BaseUnitTest() {
         }
         verify { notificationTray.cancel(habit) }
         verify(notCalled) { preferences.isSkipEnabled }
+    }
+
+    @Test
+    fun quickActionCompletesAfterSavingItsEntryAndNotes() = runTest {
+        taskRunner = CoroutineTaskRunner(StandardTestDispatcher(testScheduler), StandardTestDispatcher(testScheduler))
+        habit.originalEntries.add(Entry(today, Entry.UNKNOWN, "Keep this dated note"))
+        behavior = WidgetBehavior(habitList, CommandRunner(taskRunner), notificationTray, preferences)
+        var completed = false
+        behavior.onRemoveRepetition(habit, today) {
+            assertEquals(Entry.NO, habit.originalEntries.get(today).value)
+            assertEquals("Keep this dated note", habit.originalEntries.get(today).notes)
+            completed = true
+        }
+        assertFalse(completed)
+        assertEquals(Entry.UNKNOWN, habit.originalEntries.get(today).value)
+        runCurrent()
+        assertTrue(completed)
     }
 
     @Test

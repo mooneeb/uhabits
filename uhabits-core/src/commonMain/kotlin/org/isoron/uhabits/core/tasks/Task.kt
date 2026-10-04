@@ -24,6 +24,7 @@ fun interface Task {
     suspend fun doInBackground()
     fun onAttached(runner: TaskRunner) {}
     fun onPostExecute() {}
+    fun onFinished() {}
     fun onPreExecute() {}
     fun onProgressUpdate(currentPosition: Int) {}
 }

@@ -54,6 +54,17 @@ class WidgetReceiver : BroadcastReceiver() {
         val widgetUpdater = app.component.widgetUpdater
         Log.i(TAG, String.format("Received intent: %s", intent.toString()))
         lastReceivedIntent = intent
+        val pendingResult = when (intent.action) {
+            ACTION_ADD_REPETITION, ACTION_TOGGLE_REPETITION, ACTION_REMOVE_REPETITION -> goAsync()
+            else -> null
+        }
+        var finished = false
+        val finish = {
+            if (!finished) {
+                finished = true
+                pendingResult?.finish()
+            }
+        }
         try {
             var data: CheckmarkIntentData? = null
             if (intent.action !== ACTION_UPDATE_WIDGETS_VALUE) {
@@ -71,7 +82,8 @@ class WidgetReceiver : BroadcastReceiver() {
                     )
                     controller.onAddRepetition(
                         data.habit,
-                        data.date
+                        data.date,
+                        finish
                     )
                 }
                 ACTION_TOGGLE_REPETITION -> {
@@ -85,7 +97,8 @@ class WidgetReceiver : BroadcastReceiver() {
                     )
                     controller.onToggleRepetition(
                         data.habit,
-                        data.date
+                        data.date,
+                        finish
                     )
                 }
                 ACTION_REMOVE_REPETITION -> {
@@ -99,7 +112,8 @@ class WidgetReceiver : BroadcastReceiver() {
                     )
                     controller.onRemoveRepetition(
                         data.habit,
-                        data.date
+                        data.date,
+                        finish
                     )
                 }
                 ACTION_UPDATE_WIDGETS_VALUE -> {
@@ -109,6 +123,7 @@ class WidgetReceiver : BroadcastReceiver() {
                 }
             }
         } catch (e: RuntimeException) {
+            finish()
             Log.e("WidgetReceiver", "could not process intent", e)
         }
     }

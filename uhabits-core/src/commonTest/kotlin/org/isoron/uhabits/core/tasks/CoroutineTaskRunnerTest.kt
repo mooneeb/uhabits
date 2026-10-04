@@ -25,6 +25,9 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.isoron.uhabits.core.BaseUnitTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class CoroutineTaskRunnerTest : BaseUnitTest() {
     private lateinit var runner: CoroutineTaskRunner
@@ -48,5 +51,19 @@ class CoroutineTaskRunnerTest : BaseUnitTest() {
             task.doInBackground()
             task.onPostExecute()
         }
+    }
+
+    @Test
+    fun canceledTaskStillReleasesItsCompletionResources() {
+        var ran = false
+        var finished = false
+        runner.execute(object : Task {
+            override fun isCanceled() = true
+            override suspend fun doInBackground() { ran = true }
+            override fun onFinished() { finished = true }
+        })
+        assertFalse(ran)
+        assertTrue(finished)
+        assertEquals(0, runner.activeTaskCount)
     }
 }

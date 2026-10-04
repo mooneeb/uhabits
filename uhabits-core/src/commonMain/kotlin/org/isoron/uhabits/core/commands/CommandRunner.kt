@@ -32,6 +32,10 @@ open class CommandRunner(
     private val listeners: MutableList<Listener> = mutableListOf()
 
     open fun run(command: Command) {
+        run(command) {}
+    }
+
+    open fun run(command: Command, onComplete: () -> Unit) {
         taskRunner.execute(
             object : Task {
                 private var failure: PendingConflictException? = null
@@ -50,6 +54,7 @@ open class CommandRunner(
                         listeners.forEach { it.onCommandFailed(command, error.message ?: "Conflict requires resolution") }
                     }
                 }
+                override fun onFinished() = onComplete()
             }
         )
     }
