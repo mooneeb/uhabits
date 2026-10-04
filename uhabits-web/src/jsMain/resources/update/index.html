@@ -9,8 +9,8 @@ const status = document.querySelector('#status');
 document.querySelector('#update').onclick = async () => {
   try {
     // Refresh the browser HTTP cache as well as the service-worker cache.
-    // Unchanged scripts can otherwise retain old response metadata after deployment fixes.
-    for (const path of ['index.html', 'app.mjs', 'storage.mjs', 'drive.mjs', 'config.mjs', '../loop-core.js']) {
+    // Stable asset URLs can otherwise retain an earlier release in the HTTP cache.
+    for (const path of ['index.html', 'app.css', 'app.mjs', 'storage.mjs', 'drive.mjs', 'config.mjs', '../loop-core.js']) {
       const response = await fetch(new URL('../app/' + path, location.href), {cache: 'reload'});
       if (!response.ok) throw new Error('The current app is unavailable. Reconnect and retry.');
     }
