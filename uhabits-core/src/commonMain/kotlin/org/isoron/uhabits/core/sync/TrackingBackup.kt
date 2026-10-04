@@ -1,6 +1,7 @@
 package org.isoron.uhabits.core.sync
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,7 +34,11 @@ data class TrackingBackup(val history: ChangeHistory, val format: String = "loop
         private val codec = Json { encodeDefaults = true }
         fun decode(content: String): TrackingBackup {
             require(content.length <= 10000000) { "Backup is too large" }
-            val backup = codec.decodeFromString<TrackingBackup>(content)
+            val backup = try {
+                codec.decodeFromString<TrackingBackup>(content)
+            } catch (error: SerializationException) {
+                throw IllegalArgumentException("This backup is malformed. Export a fresh full backup from its original app before importing.", error)
+            }
             require(backup.format == "loop-tracking-backup" && backup.version == 1) { "Unsupported backup version. Update Loop before importing this file." }
             val history = ChangeHistory.decode(backup.history.encode())
             require(history.changes.all { it.sequence <= (history.clock[it.deviceId] ?: 0) }) {

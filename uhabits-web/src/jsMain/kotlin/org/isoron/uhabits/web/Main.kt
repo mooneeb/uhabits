@@ -32,7 +32,7 @@ fun main() {
     window.asDynamic().loopImportBackup = { current: String, backup: String, device: String, id: String ->
         org.isoron.uhabits.core.sync.TrackingBackup.decode(backup).restoreInto(ChangeHistory.decode(current), id, device).encode()
     }
-    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
     window.asDynamic().loopExportCSV = { content: String ->
         scope.promise {
             val bytes = org.isoron.uhabits.core.sync.TrackingCSV.export(ChangeHistory.decode(content))

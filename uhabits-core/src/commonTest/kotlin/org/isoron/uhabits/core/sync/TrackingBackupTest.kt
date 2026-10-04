@@ -51,6 +51,14 @@ class TrackingBackupTest {
     }
 
     @Test
+    fun malformedBackupGivesRecoveryInstructions() {
+        for (content in listOf("{}", """{"format":"loop-tracking-backup","schema":999}""")) {
+            val error = assertFailsWith<IllegalArgumentException> { TrackingBackup.decode(content) }
+            assertEquals("This backup is malformed. Export a fresh full backup from its original app before importing.", error.message)
+        }
+    }
+
+    @Test
     fun incompleteOrUnsupportedBackupsAreRejectedBeforeRestore() {
         val base = ChangeHistory("account").edit("phone", "create", mapOf(name to JsonPrimitive("Walk")))
         val second = base.edit("phone", "rename", mapOf(name to JsonPrimitive("Run")))
