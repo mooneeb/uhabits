@@ -66,6 +66,10 @@ open class ReminderScheduler(
         val calendar = java.util.GregorianCalendar(DateUtils.fixedTimeZone ?: java.util.TimeZone.getDefault())
         calendar.timeInMillis = reminderTime
         val days = habit.reminder!!.days.toArray()
+        if (days.none { it }) {
+            sys.cancelShowReminder(habit)
+            return
+        }
         while (!days[calendar.get(java.util.Calendar.DAY_OF_WEEK) % 7]) calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
         reminderTime = calendar.timeInMillis
         val snoozeReminderTime = widgetPreferences.getSnoozeTime(habit.id!!)
@@ -127,7 +131,12 @@ open class ReminderScheduler(
     open fun snoozeReminder(habit: Habit, minutes: Long) {
         val now = DateUtils.applyTimezone(DateUtils.getLocalTime())
         val snoozedUntil = now + minutes * 60 * 1000
-        widgetPreferences.setSnoozeTime(habit.id!!, snoozedUntil)
+        snoozeReminderUntil(habit, snoozedUntil)
+    }
+
+    @Synchronized
+    open fun snoozeReminderUntil(habit: Habit, time: Long) {
+        widgetPreferences.setSnoozeTime(habit.id!!, time)
         schedule(habit)
     }
 

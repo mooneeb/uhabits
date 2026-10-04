@@ -23,6 +23,8 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import org.isoron.uhabits.AndroidDirFinder
+import org.isoron.uhabits.core.sync.SQLiteChangeStore
+import org.isoron.uhabits.core.sync.TrackingBackup
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.inject.AppContext
 import java.io.File
@@ -31,6 +33,7 @@ import java.io.IOException
 class ExportDBTask(
     @param:AppContext private val context: Context,
     private val system: AndroidDirFinder,
+    private val changeStore: SQLiteChangeStore,
     private val listener: Listener
 ) : Task {
     private var filename: String? = null
@@ -62,9 +65,7 @@ class ExportDBTask(
         }
     }
 
-    private fun backupContent() = org.isoron.uhabits.core.sync.TrackingBackup(
-        org.isoron.uhabits.HabitsApplication.component.changeStore.history()
-    ).encode()
+    private fun backupContent() = TrackingBackup(changeStore.history()).encode()
 
     private fun saveTrackingBackup(dir: File): String {
         val file = File(dir, "Loop Backup ${System.currentTimeMillis()}.loop.json")

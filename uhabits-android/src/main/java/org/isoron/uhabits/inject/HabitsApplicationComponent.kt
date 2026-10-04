@@ -90,6 +90,10 @@ abstract class HabitsApplicationComponent(
 
     val changeStore: SQLiteChangeStore by lazy { SQLiteChangeStore(providedDb) }
 
+    @AppScope
+    @Provides
+    open fun synchronizedChanges(): SQLiteChangeStore = changeStore
+
     private val providedDb: AndroidDatabase by lazy {
         AndroidDatabase(DatabaseUtils.openDatabase())
     }

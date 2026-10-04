@@ -152,6 +152,28 @@ class ReminderSchedulerTest : BaseUnitTest() {
     }
 
     @Test
+    fun customSnoozeSurvivesSchedulingRefreshOnAnUnselectedWeekday() {
+        val storage = org.isoron.uhabits.core.preferences.MemoryStorage()
+        val persistent = WidgetPreferences(storage)
+        val scheduler = ReminderScheduler(commandRunner, habitList, sys, persistent)
+        setFixedLocalTime(unixTime(2015, 0, 26, 13, 0)) // Monday.
+        habit.reminder = Reminder(8, 30, WeekdayList(1 shl 4)) // Wednesday.
+        habitList.add(habit)
+        val customTime = unixTime(2015, 0, 27, 10, 0) // Tuesday.
+        scheduler.snoozeReminderUntil(habit, customTime)
+        scheduler.scheduleAll()
+        kotlin.test.assertEquals(customTime, persistent.getSnoozeTime(habitId))
+        verify { sys.scheduleShowReminder(customTime, habit, unixTime(2015, 0, 27, 0, 0)) }
+    }
+
+    @Test
+    fun emptyWeekdayReminderCancelsDeliveryWithoutSearchingForever() {
+        habit.reminder = Reminder(8, 30, WeekdayList(0))
+        reminderScheduler.schedule(habit)
+        verify { sys.cancelShowReminder(habit) }
+    }
+
+    @Test
     fun weekdaySchedulingUsesNativeSaturdayFirstMaskAndRetainsFutureSnooze() {
         setFixedLocalTime(unixTime(2015, 0, 26, 13, 0)) // Monday; 8:30 has passed.
         habit.reminder = Reminder(8, 30, WeekdayList(1 shl 4)) // Wednesday.

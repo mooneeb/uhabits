@@ -3,10 +3,12 @@ package org.isoron.uhabits.core.sync
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import org.isoron.platform.io.Database
 import org.isoron.platform.io.DatabaseOpener
 import org.isoron.platform.io.FileOpener
 import org.isoron.platform.io.UserFile
 import org.isoron.platform.io.getVersion
+import org.isoron.platform.io.query
 import org.isoron.platform.io.querySingle
 import org.isoron.uhabits.core.DATABASE_VERSION
 import org.isoron.uhabits.core.commands.CommandRunner
@@ -35,12 +37,16 @@ class TrackingImportReader(
             val db = opener.open(file.pathString)
             try {
                 require(db.getVersion() <= DATABASE_VERSION) { "This database needs a newer Loop version. Update before importing." }
+                require(db.querySingle("PRAGMA integrity_check") { it.getText(0) } == "ok") {
+                    "The import database is damaged. Export a fresh backup from its original app."
+                }
                 val hasHistory = db.querySingle("SELECT name FROM sqlite_master WHERE name='LoopSyncState'") { it.getText(0) } != null
                 if (hasHistory) {
                     val content = db.querySingle("SELECT history FROM LoopSyncState WHERE id=1") { it.getText(0) }
                         ?: throw IllegalArgumentException("Backup synchronization state is missing.")
                     return TrackingBackup.decode(TrackingBackup(ChangeHistory.decode(content)).encode())
                 }
+                validateSourceRows(db)
             } finally { db.close() }
         }
         val factory = MemoryModelFactory()
@@ -64,5 +70,18 @@ class TrackingImportReader(
         }
         require(edits.isNotEmpty()) { "The import contains no habits." }
         return TrackingBackup(ChangeHistory("unbound").edit("source-$importId", "source:$importId", edits))
+    }
+
+    private fun validateSourceRows(db: Database) {
+        val tables = mutableSetOf<String>()
+        db.query("SELECT name FROM sqlite_master WHERE type='table'") { tables.add(it.getText(0).lowercase()) }
+        if ("habits" in tables && "repetitions" in tables) {
+            require(db.querySingle("SELECT COUNT(*) FROM Repetitions WHERE habit IS NULL OR timestamp IS NULL OR habit NOT IN (SELECT id FROM Habits)") { it.getInt(0) } == 0) {
+                "Loop backup contains an entry with a missing habit or date. Repair the backup before importing."
+            }
+            require(db.querySingle("SELECT COUNT(*) FROM Habits WHERE name IS NULL OR freq_num IS NULL OR freq_den IS NULL OR freq_num <= 0 OR freq_den <= 0 OR archived NOT IN (0,1) OR (reminder_hour IS NULL) != (reminder_min IS NULL)") { it.getInt(0) } == 0) {
+                "Loop backup contains an invalid habit definition. Repair the backup before importing."
+            }
+        }
     }
 }

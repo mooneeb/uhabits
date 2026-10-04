@@ -103,8 +103,8 @@ class LoopDBImporter(
                 "SELECT timestamp, value, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC",
                 habitData.id.toString()
             ) { stmt ->
-                val timestamp = stmt.getLongOrNull(0) ?: return@query
-                val value = stmt.getIntOrNull(1) ?: return@query
+                val timestamp = requireNotNull(stmt.getLongOrNull(0)) { "Loop entry date is missing. Repair the backup before importing." }
+                val value = requireNotNull(stmt.getIntOrNull(1)) { "Loop entry value is missing. Repair the backup before importing." }
                 val notes = stmt.getTextOrNull(2) ?: ""
                 val date = LocalDate.fromUnixTime(timestamp)
                 val (_, existingValue, existingNotes) = entries.get(date)

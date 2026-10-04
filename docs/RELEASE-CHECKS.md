@@ -39,13 +39,15 @@ not a claim that those live journeys passed.
 
 ## Unavailable live prerequisites
 
-- Cloudflare has no existing `habits.mooneeb.dev` DNS record. The lab certificate
+- Initial Cloudflare setup found no `habits.mooneeb.dev` DNS record. The lab certificate
   token can read tunnel metadata but tunnel creation returned HTTP 403. A token
   with Cloudflare Tunnel Edit and DNS Edit (or owner dashboard setup) is required
-  for the dedicated public tunnel. The deployed route currently remains private
-  to Tailscale; public internet HTTPS has not passed.
-- Owner Google Cloud configuration must authorize the public web origin and the
-  stable release certificate. The debug OAuth client is not sufficient for the
+  for the dedicated public tunnel. The owner supplied a new local API token. A dedicated `loop-habits` tunnel
+  was created and connected (four QUIC connections); proxied CNAME and the
+  Kubernetes tunnel deployment now provide public HTTPS. `/healthz` returns
+  HTTP 200. The initial missing-permission prerequisite is resolved.
+- The owner confirmed Google Cloud registration of the public web origin and
+  stable release certificate. Real consent and transport verification remain pending. The debug OAuth client is not sufficient for the
   signed APK. Owner interaction is also needed to complete Google consent on a
   fresh signed test installation and in the browser; no tokens were injected.
 - T3 preview clicks have not exposed a Google chooser. Preview snapshot currently
@@ -71,5 +73,26 @@ no-activity timeouts. It was stopped after repeated disconnects, so the full JS
 suite is not reported as passing. The final full JVM run and Android unit run passed; focused JS portability/sync
 tests also passed. Their counts are recorded below.
 
-Final supporting test results: 309 JVM tests, 5 Android unit tests, 43 focused
+Final supporting test results: 312 JVM tests, 5 Android unit tests, 43 focused
 JS sync/import tests and 7 Node tests passed, with no failures in those runs.
+
+## Code review
+
+Standards: zero documented-standard violations and one heuristic finding: the
+backup export task reached through a global application component. The task now
+receives its SQLite change store through the existing injected factory.
+
+Spec: three code findings were fixed: zero-weekday reminder scheduling now
+cancels safely; custom clock snoozes persist and survive scheduling refreshes;
+malformed source database rows are rejected instead of skipped or date-normalized.
+New regressions cover all three supported database formats and custom/off-weekday
+snooze persistence. Required signed/public live acceptance remains pending as
+recorded above; no material scope creep was found.
+
+Review totals: Standards 1 heuristic (resolved), 0 hard violations; Spec 3 code
+findings (resolved) and 1 remaining live-acceptance gap. The worst remaining Spec
+issue is the unavailable signed/public end-to-end verification.
+
+Public browser startup caught a deployment MIME issue: stock nginx served `.mjs`
+modules as application/octet-stream. The release nginx config now explicitly
+serves `.mjs` as JavaScript, preserving the standard MIME mappings for other assets.

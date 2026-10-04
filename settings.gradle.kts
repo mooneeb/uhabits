@@ -11,6 +11,13 @@ pluginManagement {
     }
 }
 
+// Kotlin 2.3 metadata requires R8 8.13.19; AGP 8.9 bundles an older compiler.
+// https://developer.android.com/build/kotlin-support
+buildscript {
+    repositories { google() }
+    dependencies { classpath("com.android.tools:r8:8.13.19") }
+}
+
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     repositories {

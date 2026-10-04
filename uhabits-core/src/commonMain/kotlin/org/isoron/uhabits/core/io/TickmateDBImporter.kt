@@ -26,12 +26,12 @@ import org.isoron.platform.io.begin
 import org.isoron.platform.io.commit
 import org.isoron.platform.io.query
 import org.isoron.platform.io.querySingle
-import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.ModelFactory
+import org.isoron.uhabits.core.sync.RegisterValues
 import org.isoron.uhabits.core.utils.isSQLite3File
 
 /**
@@ -70,7 +70,8 @@ class TickmateDBImporter(
             val year = stmt.getInt(0)
             val month = stmt.getInt(1)
             val day = stmt.getInt(2)
-            habit.originalEntries.add(Entry(LocalDate(year, month + 1, day), Entry.YES_MANUAL))
+            val date = RegisterValues.date("$year-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}")
+            habit.originalEntries.add(Entry(date, Entry.YES_MANUAL))
         }
     }
 

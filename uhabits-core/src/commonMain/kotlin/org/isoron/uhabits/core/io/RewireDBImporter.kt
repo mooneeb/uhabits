@@ -26,7 +26,6 @@ import org.isoron.platform.io.begin
 import org.isoron.platform.io.commit
 import org.isoron.platform.io.query
 import org.isoron.platform.io.querySingle
-import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
@@ -34,6 +33,7 @@ import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.models.Reminder
 import org.isoron.uhabits.core.models.WeekdayList
+import org.isoron.uhabits.core.sync.RegisterValues
 import org.isoron.uhabits.core.utils.isSQLite3File
 
 /**
@@ -113,10 +113,12 @@ class RewireDBImporter(
             rewireHabitId.toString()
         ) { stmt ->
             val dateStr = stmt.getText(0)
+            require(Regex("[0-9]{8}").matches(dateStr)) { "Invalid Rewire entry date. Repair the backup before importing." }
             val year = dateStr.substring(0, 4).toInt()
             val month = dateStr.substring(4, 6).toInt()
             val day = dateStr.substring(6, 8).toInt()
-            habit.originalEntries.add(Entry(LocalDate(year, month, day), Entry.YES_MANUAL))
+            val date = RegisterValues.date("$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}")
+            habit.originalEntries.add(Entry(date, Entry.YES_MANUAL))
         }
     }
 

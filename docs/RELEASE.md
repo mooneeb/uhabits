@@ -32,6 +32,9 @@ Android OAuth clients; a debug APK cannot upgrade the release-signed app.
 ## Build and verify
 
 Use JDK 17, Android SDK/build-tools 35.0.0 and the repository Gradle wrapper.
+The settings pin R8 8.13.19 to handle the project’s Kotlin 2.3 metadata; older
+AGP-bundled R8 produces parsing errors. See the official
+[Kotlin/R8 compatibility table](https://developer.android.com/build/kotlin-support).
 Choose a version code greater than every APK previously installed with this key.
 From the repository root:
 
