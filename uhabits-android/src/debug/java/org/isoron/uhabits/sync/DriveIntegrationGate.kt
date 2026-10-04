@@ -119,21 +119,31 @@ class DriveIntegrationGate(private val token: String) {
     }
 
     private fun validateRecord(record: JSONObject, runId: String) {
-        require(record.getInt("schema") == 1 && record.getString("namespace") == NAMESPACE)
-        require(record.getString("runId") == runId && record.getString("accountId") == accountId)
-        require(UUID_PATTERN.matches(record.getString("operationId")))
-        require(record.getString("producer") in listOf("android", "browser"))
+        val schema = record.get("schema")
+        require(schema is Number && schema.toDouble() == 1.0 && record.get("namespace") == NAMESPACE)
+        require(record.get("runId") == runId && record.get("accountId") == accountId)
+        val operationId = record.get("operationId")
+        require(operationId is String && UUID_PATTERN.matches(operationId))
+        require(record.get("producer") in listOf("android", "browser"))
         val rawAmount = record.get("amountMillis")
         require(rawAmount is Number && rawAmount.toDouble() == rawAmount.toInt().toDouble() && rawAmount.toInt() >= 0)
-        val notes = record.getString("notes")
-        require(notes.length <= 10000)
+        val notes = record.get("notes")
+        require(notes is String && notes.length <= 10000)
         val expected = progress(rawAmount.toInt(), notes)
         val actual = record.getJSONObject("progress")
-        for (field in listOf("date", "amountMillis", "notes", "streakLength")) {
+        for (field in listOf("date", "notes")) {
             require(actual.get(field) == expected.get(field)) { "Android/browser core progress mismatch: $field" }
         }
-        val score = actual.getDouble("score")
-        require(score.isFinite() && abs(score - expected.getDouble("score")) <= 1e-10) { "Android/browser score mismatch" }
+        for (field in listOf("amountMillis", "streakLength")) {
+            val value = actual.get(field)
+            require(value is Number && value.toDouble() == expected.getInt(field).toDouble()) {
+                "Android/browser core progress mismatch: $field"
+            }
+        }
+        val score = actual.get("score")
+        require(score is Number && score.toDouble().isFinite() && abs(score.toDouble() - expected.getDouble("score")) <= 1e-10) {
+            "Android/browser score mismatch"
+        }
     }
 
     private fun request(url: String, method: String = "GET", body: String? = null, contentType: String? = null): String {

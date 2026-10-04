@@ -11,6 +11,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.ClearTokenRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
 import java.util.concurrent.Executors
@@ -26,6 +27,8 @@ class DriveIntegrationActivity : AppCompatActivity() {
     private lateinit var publish: Button
     private lateinit var discover: Button
     private var gate: DriveIntegrationGate? = null
+    private var activeToken: String? = null
+    private var rejectedToken: String? = null
     private val executor = Executors.newSingleThreadExecutor()
 
     private val authorization = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -101,12 +104,31 @@ class DriveIntegrationActivity : AppCompatActivity() {
 
     private fun authorize() {
         gate = null
-        updateButtons(false)
+        updateButtons(true)
+        val rejected = rejectedToken
+        if (rejected != null) {
+            Identity.getAuthorizationClient(this)
+                .clearToken(ClearTokenRequest.builder().setToken(rejected).build())
+                .addOnSuccessListener {
+                    rejectedToken = null
+                    requestAuthorization()
+                }
+                .addOnFailureListener {
+                    status.text = "Could not clear Google's rejected token. Connect again to retry."
+                    updateButtons(false)
+                }
+        } else {
+            requestAuthorization()
+        }
+    }
+
+    private fun requestAuthorization() {
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DriveIntegrationGate.SCOPE)))
             .build()
         Identity.getAuthorizationClient(this).authorize(request)
             .addOnSuccessListener { response ->
+                updateButtons(false)
                 if (response.hasResolution()) {
                     val intent = requireNotNull(response.pendingIntent).intentSender
                     authorization.launch(IntentSenderRequest.Builder(intent).build())
@@ -115,10 +137,14 @@ class DriveIntegrationActivity : AppCompatActivity() {
                     if (token == null) status.text = "Authorization returned no access token." else acceptToken(token)
                 }
             }
-            .addOnFailureListener { status.text = "Authorization unavailable. Check Google Play services, package name and SHA-1 registration." }
+            .addOnFailureListener {
+                status.text = "Authorization unavailable. Check Google Play services, package name and SHA-1 registration."
+                updateButtons(false)
+            }
     }
 
     private fun acceptToken(token: String) = perform {
+        activeToken = token
         val candidate = DriveIntegrationGate(token)
         val account = candidate.connect()
         gate = candidate
@@ -138,7 +164,10 @@ class DriveIntegrationActivity : AppCompatActivity() {
             val result = try {
                 work()
             } catch (error: Exception) {
-                if (error is DriveReconnectRequired) gate = null
+                if (error is DriveReconnectRequired) {
+                    rejectedToken = activeToken
+                    gate = null
+                }
                 error.message ?: "Integration request failed. Reconnect and retry."
             }
             runOnUiThread {
