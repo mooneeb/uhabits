@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
+body { margin: 0; }
+main { max-width: 720px; padding: 24px; margin: auto; }
+h1 { color: #69a9ec; }
+label { display: block; margin: 20px 0 8px; }
+input, textarea { display: block; box-sizing: border-box; width: 100%; padding: 12px; font: inherit; margin-top: 6px; }
+button { min-height: 48px; padding: 10px 16px; margin: 8px 4px 0 0; font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid #69a9ec; outline-offset: 3px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: light-dark(#eef2f5, #252a30); }

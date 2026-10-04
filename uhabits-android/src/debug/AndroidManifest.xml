@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application>
+        <activity
+            android:name=".sync.DriveIntegrationActivity"
+            android:exported="true"
+            android:label="Loop Drive integration gate" />
+    </application>
+</manifest>
