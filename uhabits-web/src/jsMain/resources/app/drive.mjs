@@ -66,7 +66,8 @@ export class DriveWorkspace {
       else if (properties.revision === previous[0].appProperties.revision)
         previous.push(file);
     }
-    const incoming = [],
+    const packages = [],
+      incoming = [],
       accepted = {};
     for (const files of includeOldPacks
       ? all.map((file) => [file])
@@ -90,9 +91,30 @@ export class DriveWorkspace {
         )
           throw new Error("Package metadata does not match its content.");
         incoming.push(JSON.stringify(pack.history));
+        packages.push({
+          id: file.id,
+          device: pack.deviceId,
+          payloadHabits: JSON.parse(
+            window.loopPayloadHabits(content, this.account, this.workspace),
+          ),
+        });
         accepted[file.id] = true;
       }
-    return { incoming, accepted };
+    return { incoming, accepted, packages };
+  }
+  async scrubPurged(history, packages) {
+    const purged = new Set(JSON.parse(history).purgedHabits || []);
+    const dirty = packages.filter((pack) =>
+      pack.payloadHabits.some((uuid) => purged.has(uuid)),
+    );
+    // Publish complete redacted device histories before removing any old payload.
+    for (const device of new Set(dirty.map((pack) => pack.device)))
+      await this.publish({ history, device });
+    for (const pack of dirty)
+      await this.request(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(pack.id)}`,
+        { method: "DELETE" },
+      );
   }
   async deleteTestWorkspace(confirmedRun) {
     if (

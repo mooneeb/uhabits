@@ -19,8 +19,11 @@
         <button data-page="habits" aria-current="page">Habits</button
         ><button data-page="archived">Archived</button
         ><button data-page="settings">Settings</button>
+        <button data-page="recovery">Recovery</button>
       </nav>
       <button id="connect">Connect Google Drive</button>
+      <a id="temporary-session" href="?mode=temporary">Temporary session</a>
+      <button id="end-session" hidden>End temporary session</button>
     </header>
     <main>
       <div class="save-status">
@@ -75,6 +78,14 @@
         <div id="habit-list"></div>
       </section>
       <section id="detail-page" hidden></section>
+      <section id="recovery-page" hidden aria-label="Deleted habits">
+        <h1>Recovery</h1>
+        <p>
+          Deleted habits retain their definition and history until you
+          explicitly purge them.
+        </p>
+        <div id="recovery-list"></div>
+      </section>
       <section id="settings-page" hidden>
         <h1>Settings</h1>
         <form id="settings-form" class="card settings">
@@ -113,11 +124,13 @@
               <option value="dark">Dark</option>
             </select></label
           >
-          <p>
+          <p id="storage-description">
             Your saved habits remain available when you reopen this installed
             app offline. Google authorization may need reconnecting when you’re
             online.
           </p>
+          <button id="disconnect" type="button">Disconnect Google Drive</button>
+          <button id="clear-local" type="button">Clear local habit data</button>
         </div>
       </section>
       <section

@@ -84,6 +84,28 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
     fun pendingCount() = store.pendingCount()
     fun account() = preferences.getString("email", "Not connected")!!
+    fun history() = store.history()
+
+    fun resolve(key: String, value: kotlinx.serialization.json.JsonElement, revisions: Set<String>) = localAction { store.resolve(key, value, revisions) }
+    fun restore(uuid: String) = localAction { store.restore(uuid) }
+    fun purge(uuid: String) = localAction { store.purge(uuid) }
+
+    private fun localAction(action: () -> Unit) {
+        executor.execute {
+            try { action(); refreshNativeModels(); updateStatus("Saved on device · pending upload"); requestSync(0) } catch (error: Exception) { updateStatus(error.message ?: "Local save failed") }
+        }
+    }
+
+    fun disconnect() {
+        executor.execute {
+            transport = null; activeToken = null; rejectedToken = null
+            if (!preferences.edit().putBoolean("disconnected", true).commit()) {
+                updateStatus("Could not save disconnect preference")
+            } else {
+                updateStatus("Disconnected · saved data and pending edits remain bound to this account")
+            }
+        }
+    }
 
     fun authorize(activity: Activity?, resolution: ((PendingIntent) -> Unit)? = null) {
         if (authorizing) return
@@ -126,7 +148,7 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
                 val candidate = DriveWorkspaceTransport(token, workspace)
                 candidate.connect()
                 store.connectAccount(candidate.accountId)
-                check(preferences.edit().putString("email", candidate.email).commit()) { "Could not save account configuration" }
+                check(preferences.edit().putString("email", candidate.email).putBoolean("disconnected", false).commit()) { "Could not save account configuration" }
                 transport = candidate
                 updateStatus("Connected · synchronizing")
                 synchronize()
@@ -145,7 +167,8 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
         val drive = transport ?: return
         updateStatus("Synchronizing · saved on device")
         try {
-            val (incoming, accepted) = drive.discover(store.knownFiles())
+            val purging = store.history().purgedHabits.isNotEmpty()
+            val (incoming, accepted) = drive.discover(if (purging) emptySet() else store.knownFiles(), purging)
             if (incoming.isNotEmpty()) {
                 store.mergeBatch(incoming, accepted)
                 refreshNativeModels()
@@ -157,9 +180,10 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
                 val revision = drive.publish(store.history(), store.deviceId)
                 store.acknowledge(revision)
             }
+            if (purging) drive.scrubPurged(store.history())
             failures = 0
             val history = store.history()
-            val conflicts = history.changes.flatMap { it.edits.keys }.distinct().count { key -> history.candidates(key).map { it.value }.distinct().size > 1 }
+            val conflicts = history.conflicts().size
             updateStatus(if (conflicts > 0) "Synchronized · $conflicts competing values preserved" else if (store.pendingCount() > 0) "Saved on device · pending upload" else "Synchronized with Drive")
         } catch (error: Exception) { failed(error) }
     }
@@ -203,7 +227,7 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
             refreshNativeModels()
             updateStatus(status)
         }
-        if (transport == null && store.history().accountId != "unbound") authorize(null)
+        if (transport == null && store.history().accountId != "unbound" && !preferences.getBoolean("disconnected", false)) authorize(null)
         requestSync(0)
     }
     override fun onActivityPaused(activity: Activity) { visible = maxOf(0, visible - 1) }

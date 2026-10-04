@@ -1,4 +1,32 @@
 // One read/write transaction stores the tracking history and pending-upload watermark together.
+function emptyState() {
+  return {
+    history: window.loopHistory("unbound"),
+    device: crypto.randomUUID(),
+    account: "unbound",
+    ack: 0,
+    known: {},
+  };
+}
+
+export function openMemoryStorage() {
+  let state = emptyState();
+  return {
+    async mutate(work) {
+      if (!state) throw new Error("This temporary session has ended.");
+      const next = work(structuredClone(state));
+      state = next;
+      return structuredClone(next);
+    },
+    async read() {
+      return structuredClone(state);
+    },
+    clear() {
+      state = null;
+    },
+  };
+}
+
 export async function openStorage(workspace) {
   const db = await new Promise((resolve, reject) => {
     const request = indexedDB.open("loop-owned-device", 1);
@@ -16,13 +44,7 @@ export async function openStorage(workspace) {
       let next, failure;
       request.onsuccess = () => {
         try {
-          const current = request.result || {
-            history: window.loopHistory("unbound"),
-            device: crypto.randomUUID(),
-            account: "unbound",
-            ack: 0,
-            known: {},
-          };
+          const current = request.result || emptyState();
           next = work(current);
           store.put(next, workspace);
         } catch (error) {
@@ -36,5 +58,9 @@ export async function openStorage(workspace) {
           failure || new Error("Save failed. This edit was not durably saved."),
         );
     });
-  return { mutate, read: () => mutate((state) => state) };
+  return {
+    mutate,
+    read: () => mutate((state) => state),
+    clear: () => mutate(() => emptyState()),
+  };
 }

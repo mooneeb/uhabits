@@ -1,5 +1,5 @@
 import { config } from "./config.mjs";
-import { openStorage } from "./storage.mjs";
+import { openStorage, openMemoryStorage } from "./storage.mjs";
 import { DriveWorkspace, SCOPE } from "./drive.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -60,11 +60,27 @@ const testRun = new URLSearchParams(location.search).get("testRun");
 if (testRun && !/^[a-f0-9-]{36}$/.test(testRun))
   throw new Error("Invalid test workspace.");
 const workspace = testRun || config.workspaceId;
+const temporary =
+  location.pathname.endsWith("/session/") ||
+  new URLSearchParams(location.search).get("mode") === "temporary";
+const temporaryUrl = new URL(location.href);
+temporaryUrl.pathname = temporaryUrl.pathname.replace(/app\/$/, "session/");
+temporaryUrl.searchParams.delete("mode");
+$("temporary-session").href = temporaryUrl.href;
+$("temporary-session").hidden = temporary;
+$("end-session").hidden = !temporary;
+if (temporary) {
+  document.querySelector('link[rel="manifest"]').remove();
+  $("storage-description").textContent =
+    "This temporary session keeps data only until it ends. New edits require an online authorized connection. Keep it open until pending saves finish.";
+}
+let ended = false;
 // Keep an installed synthetic test in its isolated workspace on every launch.
 if (testRun) {
   document.querySelector(".brand").href = location.href;
-  document.querySelector("link[rel=manifest]").href =
-    `manifest.webmanifest?testRun=${testRun}`;
+  if (!temporary)
+    document.querySelector("link[rel=manifest]").href =
+      `manifest.webmanifest?testRun=${testRun}`;
 }
 $("connect").disabled = true;
 $("new-habit").disabled = true;
@@ -115,7 +131,8 @@ function currentView() {
   return view;
 }
 function pending() {
-  return JSON.parse(state.history).changes.filter(
+  if (!state) return 0;
+  return (JSON.parse(state.history).changes || []).filter(
     (change) => change.deviceId === state.device && change.sequence > state.ack,
   ).length;
 }
@@ -123,10 +140,20 @@ function cloudStatus(text) {
   $("sync-status").textContent = text;
 }
 function savedStatus() {
-  $("save-status").textContent = "Saved on this device";
+  $("save-status").textContent = temporary
+    ? pending()
+      ? "Pending save in memory · keep this session open"
+      : drive
+        ? "Saved in Drive · temporary session"
+        : "Temporary session · no offline storage"
+    : "Saved on this device";
 }
 function refreshCloud() {
   if (!state) return;
+  $("new-habit").disabled =
+    ended ||
+    (temporary && (!drive || !navigator.onLine || Date.now() >= expiresAt));
+  if (temporary) savedStatus();
   if (!drive)
     cloudStatus(
       state.account === "unbound"
@@ -136,39 +163,46 @@ function refreshCloud() {
   else if (!navigator.onLine) cloudStatus(`Offline · ${pending()} pending`);
   else if (pending()) cloudStatus(`${pending()} pending changes`);
 }
-async function edit(patch) {
+async function mutateHistory(change) {
   try {
+    if (ended) throw new Error("This session has ended.");
+    if (temporary && (!navigator.onLine || !drive || Date.now() >= expiresAt))
+      throw new Error(
+        "Temporary sessions can edit only while online and authorized.",
+      );
     if (cleaningTest)
       throw new Error("This test workspace is closed for cleanup.");
-    if (Object.keys(patch).some((key) => view.conflicts[key]))
-      throw new Error(
-        "Competing revisions are preserved. Conflict resolution is required before editing this value.",
-      );
     state = await storage.mutate((current) => ({
       ...current,
-      history: window.loopEdit(
-        current.history,
-        current.device,
-        crypto.randomUUID(),
-        JSON.stringify(patch),
-      ),
+      history: change(current),
     }));
     currentView();
     render();
     savedStatus();
     refreshCloud();
-    scheduleSync();
+    if (temporary) await sync();
+    else scheduleSync();
   } catch (error) {
     $("save-status").textContent = errorMessage(error);
     throw error;
   }
+}
+async function edit(patch) {
+  return mutateHistory((current) =>
+    window.loopEdit(
+      current.history,
+      current.device,
+      crypto.randomUUID(),
+      JSON.stringify(patch),
+    ),
+  );
 }
 function scheduleSync(delay = 400) {
   clearTimeout(retryTimer);
   retryTimer = setTimeout(() => sync(), delay);
 }
 async function sync() {
-  if (cleaningTest) return;
+  if (cleaningTest || ended) return;
   if (syncing) {
     syncAgain = true;
     return;
@@ -182,7 +216,8 @@ async function sync() {
   $("sync").disabled = true;
   cloudStatus("Synchronizing…");
   try {
-    const remote = await drive.discover(state.known);
+    const purging = (JSON.parse(state.history).purgedHabits || []).length > 0;
+    const remote = await drive.discover(purging ? {} : state.known, purging);
     state = await storage.mutate((current) => {
       let history = current.history;
       for (const content of remote.incoming)
@@ -203,6 +238,7 @@ async function sync() {
         ack: Math.max(current.ack, acknowledged),
       }));
     }
+    if (purging) await drive.scrubPurged(state.history, remote.packages);
     retry = 0;
     cloudStatus(
       pending() ? `${pending()} pending changes` : "Synchronized with Drive",
@@ -211,8 +247,10 @@ async function sync() {
   } catch (error) {
     const message = errorMessage(error);
     cloudStatus(message);
-    if (message.startsWith("Reconnect required")) drive = undefined;
-    else if (drive)
+    if (message.startsWith("Reconnect required")) {
+      drive = undefined;
+      refreshCloud();
+    } else if (drive)
       scheduleSync(Math.min(60000, 1000 * 2 ** Math.min(++retry, 6)));
   } finally {
     syncing = false;
@@ -224,6 +262,7 @@ async function sync() {
   }
 }
 $("connect").onclick = () => {
+  if (syncing || ended) return;
   if (!window.google?.accounts?.oauth2) {
     cloudStatus("Google sign-in is unavailable. Reconnect when online.");
     return;
@@ -300,7 +339,10 @@ function completed(habit) {
 }
 function render() {
   if (!view) return;
-  $("habits-page").hidden = page === "settings" || page === "detail";
+  $("new-habit").disabled =
+    temporary && (!drive || !navigator.onLine || Date.now() >= expiresAt);
+  $("habits-page").hidden = !["habits", "archived"].includes(page);
+  $("recovery-page").hidden = page !== "recovery";
   $("detail-page").hidden = page !== "detail";
   $("settings-page").hidden = page !== "settings";
   document
@@ -316,6 +358,7 @@ function render() {
   const query = $("search").value.toLocaleLowerCase();
   let habits = view.habits.filter(
     (habit) =>
+      !habit.deleted &&
       habit.archived === (page === "archived") &&
       `${habit.name} ${habit.question} ${habit.description}`
         .toLocaleLowerCase()
@@ -363,19 +406,27 @@ function render() {
     settings.elements.weekStart.value = view.weekStart;
   }
   if (page === "detail") renderDetail();
+  $("recovery-list").innerHTML =
+    view.habits
+      .filter((habit) => habit.deleted)
+      .map(
+        (habit) =>
+          `<article class="card"><h2>${escape(habit.name)}</h2><p>${escape(habit.description)}</p><details><summary>Retained history</summary><pre>${escape(
+            JSON.stringify(
+              (habit.history || []).filter((entry) => entry.recorded),
+              null,
+              2,
+            ),
+          )}</pre></details><button data-restore="${habit.uuid}">Restore habit</button><button data-purge="${habit.uuid}">Purge permanently</button></article>`,
+      )
+      .join("") || "<p>No deleted habits.</p>";
   const conflicts = Object.entries(view.conflicts);
   $("conflicts").hidden = !conflicts.length;
   $("conflicts").innerHTML = conflicts.length
     ? `<h2>Competing revisions preserved</h2><p>Both versions remain saved. Editing an affected value is paused until its conflict is resolved.</p>${conflicts
         .map(
           ([key, revisions]) =>
-            `<details><summary>${escape(key.startsWith("entry:") ? "Entry " + key.split(":")[2] : key.split(":").at(-1))}</summary><pre>${escape(
-              JSON.stringify(
-                revisions.map((revision) => revision.value),
-                null,
-                2,
-              ),
-            )}</pre></details>`,
+            `<details><summary>${escape(key)}</summary>${revisions.map((revision, index) => `<pre>${escape(JSON.stringify(revision.value, null, 2))}</pre><button data-resolve="${escape(key)}" data-revision="${index}">Keep this version</button>`).join("")}</details>`,
         )
         .join("")}`
     : "";
@@ -399,7 +450,7 @@ function renderDetail() {
     (_, index) => (view.weekStart - 1 + index) % 7,
   );
   $("detail-page").innerHTML =
-    `<button id="back">← Habits</button><div class="heading"><h1 style="color:${color}">${escape(habit.name)}</h1><button data-edit="${habit.uuid}">Edit habit</button></div><p class="detail-meta">${escape(habit.question)}<br>${escape(habit.description)}</p><div class="detail-actions"><button data-record="${habit.uuid}" class="primary">Record a day</button><button data-archive="${habit.uuid}">${habit.archived ? "Reactivate" : "Archive"}</button><label>Graph period <select id="period">${periods.map((label, index) => `<option value="${index}" ${index === period ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>${
+    `<button id="back">← Habits</button><div class="heading"><h1 style="color:${color}">${escape(habit.name)}</h1><button data-edit="${habit.uuid}">Edit habit</button></div><p class="detail-meta">${escape(habit.question)}<br>${escape(habit.description)}</p><div class="detail-actions"><button data-record="${habit.uuid}" class="primary">Record a day</button><button data-delete="${habit.uuid}">Delete habit</button><button data-archive="${habit.uuid}">${habit.archived ? "Reactivate" : "Archive"}</button><label>Graph period <select id="period">${periods.map((label, index) => `<option value="${index}" ${index === period ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>${
       habit.tracking
         ? `<div class="details-grid"><section class="card"><h2>Habit strength</h2><p class="metric">${Math.round((habit.score || 0) * 100)}%</p>${chart(habit.scores || [], color, true)}</section><section class="card"><h2>${habit.tracking.type === 1 ? "Amount" : "Completed days"}</h2><p class="muted">${escape(habit.tracking.type === 1 ? `${habit.tracking.targetType === 0 ? "At least" : "At most"} ${habit.tracking.targetValue} ${habit.tracking.unit} per ${habit.tracking.freqDen} days` : `${habit.tracking.freqNum} times in ${habit.tracking.freqDen} days`)}</p>${chart(habit.bars || [], color)}</section>${habit.tracking.type === 1 ? `<section class="card"><h2>Targets</h2>${(habit.targets || []).map((target) => `<div class="target-row"><span>${{ 1: "Today", 7: "This week", 30: "This month", 91: "This quarter", 365: "This year" }[target.days]}</span><span>${target.value} / ${Number(target.target.toFixed(3))} ${escape(habit.tracking.unit)}</span></div>`).join("")}</section>` : ""}<section class="card"><h2>Best streaks</h2>${habit.streaks?.length ? habit.streaks.map((streak) => `<div class="target-row"><span>${streak.start} – ${streak.end}</span><strong>${streak.length} days</strong></div>`).join("") : '<p class="muted">Your first streak starts with a completed day.</p>'}</section></div><section class="card"><h2>Weekday frequency</h2><div class="weekday-table"><table><thead><tr><th>Month</th>${orderedDays.map((day) => `<th>${WEEKDAYS[day].slice(0, 3)}</th>`).join("")}</tr></thead><tbody>${(habit.weekdays || []).map((month) => `<tr><td>${month.month.slice(0, 7)}</td>${orderedDays.map((day) => `<td>${month.values[(day + 1) % 7] / (habit.tracking.type === 1 ? 1000 : 1)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></section><section class="card"><h2>History & entry notes</h2><div class="detail-history"><table><thead><tr><th>Date</th><th>Outcome</th><th>Entry notes</th><th></th></tr></thead><tbody>${(
             habit.history || []
@@ -486,6 +537,52 @@ document.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   try {
+    if (button.dataset.resolve) {
+      const key = button.dataset.resolve,
+        revisions = view.conflicts[key];
+      const chosen = revisions[Number(button.dataset.revision)];
+      await mutateHistory((current) =>
+        window.loopResolve(
+          current.history,
+          current.device,
+          crypto.randomUUID(),
+          key,
+          JSON.stringify(chosen.value),
+          JSON.stringify(revisions.map((revision) => revision.id)),
+        ),
+      );
+    }
+    if (
+      button.dataset.delete &&
+      confirm("Delete this habit into recovery? Its history will be retained.")
+    ) {
+      await edit({ [`habit:${button.dataset.delete}:deleted`]: true });
+      page = "habits";
+      render();
+    }
+    if (button.dataset.restore)
+      await mutateHistory((current) =>
+        window.loopRestore(
+          current.history,
+          current.device,
+          crypto.randomUUID(),
+          button.dataset.restore,
+        ),
+      );
+    if (
+      button.dataset.purge &&
+      confirm(
+        "Permanently remove this habit and its history? It cannot be restored.",
+      )
+    )
+      await mutateHistory((current) =>
+        window.loopPurge(
+          current.history,
+          current.device,
+          crypto.randomUUID(),
+          button.dataset.purge,
+        ),
+      );
     if (button.dataset.page) {
       page = button.dataset.page;
       selected = undefined;
@@ -532,9 +629,11 @@ document.addEventListener("click", async (event) => {
       await edit({ [`habit:${habit.uuid}:archived`]: !habit.archived });
     }
     if (button.dataset.move) {
-      const all = [...view.habits].sort(
-        (a, b) => a.position - b.position || a.uuid.localeCompare(b.uuid),
-      );
+      const all = view.habits
+        .filter((habit) => !habit.deleted)
+        .sort(
+          (a, b) => a.position - b.position || a.uuid.localeCompare(b.uuid),
+        );
       const index = all.findIndex(
           (habit) => habit.uuid === button.dataset.move,
         ),
@@ -670,6 +769,103 @@ $("settings-form").onsubmit = async (event) => {
 };
 $("new-habit").onclick = () => showHabit();
 $("sync").onclick = () => sync();
+$("disconnect").onclick = () => {
+  if (syncing) {
+    cloudStatus("Wait for synchronization to finish before disconnecting.");
+    return;
+  }
+  if (
+    pending() &&
+    !confirm(
+      "Disconnect with pending edits? They will remain on this device, bound to this Google account. Reconnect that same account to upload them.",
+    )
+  )
+    return;
+  drive = undefined;
+  expiresAt = 0;
+  clearTimeout(retryTimer);
+  refreshCloud();
+};
+$("clear-local").hidden = temporary;
+$("disconnect").hidden = temporary;
+$("clear-local").onclick = async () => {
+  if (syncing) {
+    cloudStatus(
+      "Wait for synchronization to finish before clearing local data.",
+    );
+    return;
+  }
+  if (
+    !confirm(
+      pending()
+        ? "Discard unsynchronized edits and all local habit data? These pending changes will be lost permanently."
+        : "Clear this device's habit data? Drive data is retained.",
+    )
+  )
+    return;
+  try {
+    state = await storage.clear();
+    drive = undefined;
+    expiresAt = 0;
+    clearTimeout(retryTimer);
+    currentView();
+    render();
+    savedStatus();
+    refreshCloud();
+  } catch (error) {
+    $("save-status").textContent = errorMessage(error);
+  }
+};
+function endSession() {
+  ended = true;
+  storage?.clear();
+  drive = undefined;
+  state = undefined;
+  view = undefined;
+  habitBaseline = undefined;
+  settingsBaseline = undefined;
+  selected = undefined;
+  $("connect").title = "";
+  expiresAt = 0;
+  clearTimeout(retryTimer);
+  document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+  $("habit-form").reset();
+  $("entry-form").reset();
+  $("habit-list").replaceChildren();
+  $("detail-page").replaceChildren();
+  $("recovery-list").replaceChildren();
+  $("conflicts").replaceChildren();
+  $("save-status").textContent = "Temporary session ended · memory cleared";
+  cloudStatus("Session ended");
+  $("connect").disabled = true;
+  $("new-habit").disabled = true;
+}
+$("end-session").onclick = () => {
+  if (syncing) {
+    cloudStatus("A save is in progress. Wait before ending this session.");
+    return;
+  }
+  if (
+    pending() &&
+    !confirm(
+      "Pending saves exist only in memory. End the session and discard them?",
+    )
+  )
+    return;
+  endSession();
+};
+window.addEventListener("beforeunload", (event) => {
+  if (temporary && pending()) {
+    event.preventDefault();
+    event.returnValue = "Pending saves exist only in this session.";
+  }
+});
+window.addEventListener("pagehide", () => {
+  if (temporary) endSession();
+});
+window.addEventListener("pageshow", (event) => {
+  if (temporary && event.persisted) location.reload();
+});
 $("test-cleanup-form").onsubmit = async (event) => {
   event.preventDefault();
   if (cleaningTest) return;
@@ -723,12 +919,13 @@ function applyTheme() {
 }
 $("theme").onchange = () => {
   try {
-    localStorage.setItem("loop-device-theme", $("theme").value);
+    if (!temporary) localStorage.setItem("loop-device-theme", $("theme").value);
   } catch {}
   applyTheme();
 };
 systemTheme.onchange = applyTheme;
 window.addEventListener("beforeinstallprompt", (event) => {
+  if (temporary) return;
   event.preventDefault();
   installPrompt = event;
   $("install").hidden = false;
@@ -754,19 +951,20 @@ try {
     await new Promise((resolve) =>
       window.addEventListener("loop-core-ready", resolve, { once: true }),
     );
-  storage = await openStorage(workspace);
+  storage = temporary ? openMemoryStorage() : await openStorage(workspace);
   state = await storage.read();
   currentView();
   render();
   savedStatus();
   refreshCloud();
   $("connect").disabled = false;
-  $("new-habit").disabled = false;
+  $("new-habit").disabled = temporary;
   $("habit-form").elements.color.innerHTML = COLOR_NAMES.map(
     (name, index) => `<option value="${index}">${name}</option>`,
   ).join("");
   try {
-    $("theme").value = localStorage.getItem("loop-device-theme") || "system";
+    if (!temporary)
+      $("theme").value = localStorage.getItem("loop-device-theme") || "system";
   } catch {}
   applyTheme();
   if (testRun) {
@@ -774,7 +972,7 @@ try {
     $("test-workspace").hidden = false;
     $("test-workspace").textContent = `Isolated workflow test: ${testRun}`;
   }
-  if ("serviceWorker" in navigator)
+  if (!temporary && "serviceWorker" in navigator)
     await navigator.serviceWorker.register("sw.js");
 } catch (error) {
   $("save-status").textContent = errorMessage(error);

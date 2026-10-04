@@ -12,6 +12,9 @@ import java.util.UUID
 class WorkspaceAuthorizationExpired : Exception("Reconnect required. Google authorization expired.")
 
 class DriveWorkspaceTransport(private val token: String, private val workspace: String) {
+    data class DiscoveredPackage(val id: String, val device: String, val payloadHabits: Set<String>)
+    var discoveredPackages: List<DiscoveredPackage> = emptyList()
+        private set
     var accountId: String = ""
         private set
     var email: String = ""
@@ -24,7 +27,7 @@ class DriveWorkspaceTransport(private val token: String, private val workspace: 
         email = user.optString("emailAddress", accountId)
     }
 
-    fun discover(known: Set<String>): Pair<List<ChangeHistory>, Set<String>> {
+    fun discover(known: Set<String>, includeOldPacks: Boolean = false): Pair<List<ChangeHistory>, Set<String>> {
         val files = mutableListOf<JSONObject>()
         var pageToken = ""
         do {
@@ -53,7 +56,8 @@ class DriveWorkspaceTransport(private val token: String, private val workspace: 
         }
         val incoming = mutableListOf<ChangeHistory>()
         val accepted = mutableSetOf<String>()
-        for (file in latest.values.flatten()) {
+        val packages = mutableListOf<DiscoveredPackage>()
+        for (file in if (includeOldPacks) files else latest.values.flatten()) {
             val id = file.getString("id")
             if (id in known) continue
             val content = request("https://www.googleapis.com/drive/v3/files/${Uri.encode(id)}?alt=media")
@@ -65,8 +69,16 @@ class DriveWorkspaceTransport(private val token: String, private val workspace: 
             ) { "Package metadata mismatch" }
             incoming.add(pack.history)
             accepted.add(id)
+            packages.add(DiscoveredPackage(id, pack.deviceId, DrivePack.payloadHabits(content, accountId, workspace)))
         }
+        discoveredPackages = packages
         return incoming to accepted
+    }
+
+    fun scrubPurged(history: ChangeHistory) {
+        val dirty = discoveredPackages.filter { pack -> pack.payloadHabits.any { it in history.purgedHabits } }
+        for (device in dirty.map { it.device }.toSet()) publish(history, device)
+        for (pack in dirty) request("https://www.googleapis.com/drive/v3/files/${Uri.encode(pack.id)}", "DELETE")
     }
 
     fun publish(history: ChangeHistory, device: String): Int {

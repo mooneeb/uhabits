@@ -61,8 +61,9 @@ export async function record(name, date, value, notes) {
     form.querySelector(".form-error").textContent,
   );
   assert(
-    document.querySelector("#save-status").textContent ===
-      "Saved on this device",
+    ["Saved on this device", "Saved in Drive · temporary session"].includes(
+      document.querySelector("#save-status").textContent,
+    ),
     "Save failed",
   );
   const row = document
@@ -102,4 +103,45 @@ export function visibleHabits() {
     name: button.textContent,
     uuid: button.dataset.detail,
   }));
+}
+
+export async function failedLocalSave() {
+  requireTestWorkspace();
+  click("[data-page=habits]");
+  const name = "Unsaved fault-injection habit";
+  click("#new-habit");
+  const form = document.querySelector("#habit-form");
+  field(form, "name", name);
+  const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function () {
+    throw new DOMException(
+      "Injected durable save failure",
+      "QuotaExceededError",
+    );
+  };
+  try {
+    form.requestSubmit();
+    await waitFor(
+      () => form.querySelector(".form-error").textContent,
+      "Failed durable save was not reported",
+    );
+    assert(
+      document.querySelector("#habit-dialog").open,
+      "Failed save closed the editor",
+    );
+    assert(
+      document
+        .querySelector("#save-status")
+        .textContent.includes("Injected durable save failure"),
+      "Failed save was reported as saved",
+    );
+    assert(
+      !visibleHabits().some((habit) => habit.name === name),
+      "Failed save changed visible habits",
+    );
+    click("[data-close=habit-dialog]");
+    return { durableSaveRejected: true, name };
+  } finally {
+    IDBObjectStore.prototype.put = put;
+  }
 }

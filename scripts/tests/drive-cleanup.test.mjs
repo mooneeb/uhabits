@@ -32,13 +32,17 @@ test("a malformed later test pack prevents every deletion", async () => {
     requests.push({ url, method: options?.method });
     if (url.includes("?alt=media"))
       return {
-        text: async () => (url.includes("file1") ? "valid" : "malformed"),
+        text: async () =>
+          url.includes("file1") ? JSON.stringify({ history: {} }) : "malformed",
       };
     return { json: async () => ({ files }) };
   };
   // The real core separately validates packs. This fault isolates the requirement
   // that all validation completes before any destructive request starts.
   globalThis.window = {
+    loopPayloadHabits() {
+      return "[]";
+    },
     loopDecodePack(content) {
       if (content === "malformed") throw new Error("Unsupported pack");
       return JSON.stringify({ deviceId: "device", revision: 1, history: {} });
