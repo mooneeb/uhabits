@@ -23,6 +23,46 @@ export class DriveWorkspace {
       );
     return response;
   }
+  async synchronize(storage) {
+    let state = await storage.read();
+    const scannedPurges = JSON.parse(state.history).purgedHabits || [];
+    const fullScan = scannedPurges.some(
+      (uuid) => !(state.cleanedPurges || []).includes(uuid),
+    );
+    const remote = await this.discover(
+      fullScan ? {} : state.known,
+      scannedPurges.length > 0,
+    );
+    state = await storage.mutate((current) => {
+      let history = current.history;
+      for (const content of remote.incoming)
+        history = window.loopMerge(history, content);
+      return { ...current, history };
+    });
+    if (
+      JSON.parse(state.history).changes.some(
+        (change) =>
+          change.deviceId === state.device && change.sequence > state.ack,
+      )
+    ) {
+      const acknowledged = await this.publish(state);
+      state = await storage.mutate((current) => ({
+        ...current,
+        ack: Math.max(current.ack, acknowledged),
+      }));
+    }
+    if (scannedPurges.length)
+      await this.scrubPurged(state.history, remote.packages);
+    // A failed cleanup leaves these files unacknowledged so the next scan retries it.
+    // Purges received during this scan require their own full scan next time.
+    return storage.mutate((current) => ({
+      ...current,
+      known: { ...current.known, ...remote.accepted },
+      cleanedPurges: [
+        ...new Set([...(current.cleanedPurges || []), ...scannedPurges]),
+      ],
+    }));
+  }
   async discover(known, includeOldPacks = false) {
     const all = [];
     let pageToken;

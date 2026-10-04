@@ -6,6 +6,7 @@ function emptyState() {
     account: "unbound",
     ack: 0,
     known: {},
+    cleanedPurges: [],
   };
 }
 

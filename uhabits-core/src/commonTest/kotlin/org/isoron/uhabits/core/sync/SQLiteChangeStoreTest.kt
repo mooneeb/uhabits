@@ -17,6 +17,34 @@ import kotlin.test.assertSame
 
 class SQLiteChangeStoreTest {
     @Test
+    fun completedPurgeDiscoverySurvivesRestartAndFailedCleanupRemainsRetryable() = runTest {
+        val db = BaseUnitTest.buildMemoryDatabase()
+        try {
+            val failing = FailingDatabase(db)
+            val store = SQLiteChangeStore(failing)
+            val factory = SQLModelFactory(failing, store)
+            val habit = factory.buildHabit().apply { name = "Purge discovery fixture" }
+            val habits = factory.buildHabitList()
+            habits.add(habit)
+            store.mergeBatch(emptyList(), setOf("previously-seen"))
+            habits.remove(habit)
+            store.purge(habit.uuid!!)
+            val scanned = store.history().purgedHabits
+            assertEquals(emptySet(), store.knownFilesForDiscovery(scanned))
+            failing.failSqlPrefix = "INSERT OR IGNORE INTO LoopSyncCleanedPurges"
+            failing.failWrite = true
+            assertFailsWith<IllegalStateException> { store.completeDiscovery(setOf("clean"), scanned) }
+            failing.failWrite = false
+            val reopened = SQLiteChangeStore(db)
+            assertEquals(setOf("previously-seen"), reopened.knownFiles())
+            assertEquals(emptySet(), reopened.knownFilesForDiscovery(scanned))
+            reopened.completeDiscovery(setOf("clean"), scanned)
+            assertEquals(setOf("previously-seen", "clean"), SQLiteChangeStore(db).knownFilesForDiscovery(scanned))
+            assertEquals(emptySet(), reopened.knownFilesForDiscovery(scanned + "new-purge"))
+        } finally { db.close() }
+    }
+
+    @Test
     fun olderBackupRestoreIsDurablePendingWorkAndPreservesCompetingAndIndependentEntries() = runTest {
         val db = BaseUnitTest.buildMemoryDatabase()
         try {
@@ -279,11 +307,12 @@ class SQLiteChangeStoreTest {
 
     private class FailingDatabase(private val db: Database) : Database by db {
         var failWrite = false
+        var failSqlPrefix = "UPDATE LoopSyncState"
         override fun prepareStatement(sql: String): PreparedStatement {
             val statement = db.prepareStatement(sql)
             return object : PreparedStatement by statement {
                 override fun step(): StepResult {
-                    if (failWrite && sql.startsWith("UPDATE LoopSyncState")) {
+                    if (failWrite && sql.startsWith(failSqlPrefix)) {
                         failWrite = false
                         statement.finalize()
                         throw IllegalStateException("Disk write failed")

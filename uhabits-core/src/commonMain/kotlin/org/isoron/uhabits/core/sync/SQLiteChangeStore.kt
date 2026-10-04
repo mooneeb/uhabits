@@ -26,6 +26,7 @@ class SQLiteChangeStore(private val db: Database) {
     init {
         db.run("CREATE TABLE IF NOT EXISTS LoopSyncState (id INTEGER PRIMARY KEY, device TEXT NOT NULL, history TEXT NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0)")
         db.run("CREATE TABLE IF NOT EXISTS LoopSyncFiles (id TEXT PRIMARY KEY)")
+        db.run("CREATE TABLE IF NOT EXISTS LoopSyncCleanedPurges (uuid TEXT PRIMARY KEY)")
         db.run("INSERT OR IGNORE INTO LoopSyncState(id, device, history) VALUES (1, ?, ?)") {
             bindText(1, Uuid.random().toHexString())
             bindText(2, ChangeHistory("unbound").encode())
@@ -68,6 +69,20 @@ class SQLiteChangeStore(private val db: Database) {
         val result = mutableSetOf<String>()
         db.query("SELECT id FROM LoopSyncFiles") { result.add(it.getText(0)) }
         return result
+    }
+
+    @Synchronized
+    fun knownFilesForDiscovery(purges: Set<String>): Set<String> {
+        val cleaned = mutableSetOf<String>()
+        db.query("SELECT uuid FROM LoopSyncCleanedPurges") { cleaned.add(it.getText(0)) }
+        return if (cleaned.containsAll(purges)) knownFiles() else emptySet()
+    }
+
+    /** Record inspected files only after their purge cleanup has succeeded. */
+    @Synchronized
+    fun completeDiscovery(fileIds: Set<String>, scannedPurges: Set<String>) = atomic {
+        for (id in fileIds) db.run("INSERT OR IGNORE INTO LoopSyncFiles(id) VALUES (?)") { bindText(1, id) }
+        for (uuid in scannedPurges) db.run("INSERT OR IGNORE INTO LoopSyncCleanedPurges(uuid) VALUES (?)") { bindText(1, uuid) }
     }
 
     @Synchronized

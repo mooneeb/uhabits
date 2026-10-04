@@ -216,29 +216,9 @@ async function sync() {
   $("sync").disabled = true;
   cloudStatus("Synchronizing…");
   try {
-    const purging = (JSON.parse(state.history).purgedHabits || []).length > 0;
-    const remote = await drive.discover(purging ? {} : state.known, purging);
-    state = await storage.mutate((current) => {
-      let history = current.history;
-      for (const content of remote.incoming)
-        history = window.loopMerge(history, content);
-      return {
-        ...current,
-        history,
-        known: { ...current.known, ...remote.accepted },
-      };
-    });
+    state = await drive.synchronize(storage);
     currentView();
     render();
-    if (pending()) {
-      const snapshot = state;
-      const acknowledged = await drive.publish(snapshot);
-      state = await storage.mutate((current) => ({
-        ...current,
-        ack: Math.max(current.ack, acknowledged),
-      }));
-    }
-    if (purging) await drive.scrubPurged(state.history, remote.packages);
     retry = 0;
     cloudStatus(
       pending() ? `${pending()} pending changes` : "Synchronized with Drive",

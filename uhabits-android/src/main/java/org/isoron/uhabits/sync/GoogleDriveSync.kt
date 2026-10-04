@@ -173,10 +173,10 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
         val drive = transport ?: return false
         updateStatus("Synchronizing · saved on device")
         try {
-            val purging = store.history().purgedHabits.isNotEmpty()
-            val (incoming, accepted) = drive.discover(if (purging) emptySet() else store.knownFiles(), purging)
+            val scannedPurges = store.history().purgedHabits
+            val (incoming, accepted) = drive.discover(store.knownFilesForDiscovery(scannedPurges), scannedPurges.isNotEmpty())
             if (incoming.isNotEmpty()) {
-                store.mergeBatch(incoming, accepted)
+                store.mergeBatch(incoming, emptySet())
                 refreshNativeModels()
             }
             val knownSettings = store.history().changes.flatMap { it.edits.keys }.toSet()
@@ -186,7 +186,8 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
                 val revision = drive.publish(store.history(), store.deviceId)
                 store.acknowledge(revision)
             }
-            if (purging) drive.scrubPurged(store.history())
+            if (scannedPurges.isNotEmpty()) drive.scrubPurged(store.history())
+            store.completeDiscovery(accepted, scannedPurges)
             failures = 0
             val history = store.history()
             val conflicts = history.conflicts().size
