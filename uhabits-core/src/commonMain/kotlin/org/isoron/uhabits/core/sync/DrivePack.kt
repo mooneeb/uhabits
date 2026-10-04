@@ -12,12 +12,12 @@ data class DrivePack(
     val deviceId: String,
     val revision: Int,
     val history: ChangeHistory,
-    val schema: Int = 1
+    val schema: Int = 2
 ) {
     fun encode(): String = codec.encodeToString(this)
 
     fun validate(accountId: String, workspace: String): DrivePack {
-        require(schema == 1 && namespace == NAMESPACE && workspaceId == workspace) { "Unsupported workspace package" }
+        require(schema in 1..2 && namespace == NAMESPACE && workspaceId == workspace) { "Unsupported workspace package" }
         require(history.accountId == accountId) { "Package belongs to another Google account" }
         require(Regex("[a-zA-Z0-9_-]{1,128}").matches(deviceId) && Regex("[a-zA-Z0-9_-]{1,128}").matches(workspaceId)) { "Invalid workspace identity" }
         require(revision > 0 && history.changes.all { it.deviceId == deviceId }) { "Invalid device package" }
@@ -33,12 +33,20 @@ data class DrivePack(
         fun create(history: ChangeHistory, deviceId: String, workspace: String): DrivePack? {
             val changes = history.changes.filter { it.deviceId == deviceId }
             if (changes.isEmpty()) return null
-            return DrivePack(NAMESPACE, workspace, deviceId, changes.maxOf { it.sequence }, ChangeHistory(history.accountId, changes)).validate(history.accountId, workspace)
+            return DrivePack(NAMESPACE, workspace, deviceId, changes.maxOf { it.sequence }, history.copy(changes = changes)).validate(history.accountId, workspace)
         }
 
         fun decode(content: String, accountId: String, workspace: String): DrivePack {
             require(content.length <= 10000000) { "Workspace package is too large" }
             return codec.decodeFromString<DrivePack>(content).validate(accountId, workspace)
+        }
+
+        fun payloadHabits(content: String, accountId: String, workspace: String): Set<String> {
+            decode(content, accountId, workspace)
+            val raw = codec.decodeFromString<DrivePack>(content)
+            return raw.history.changes.flatMap { it.edits.keys }.filter {
+                it.startsWith("habit:") || it.startsWith("entry:")
+            }.map { it.split(':')[1] }.toSet()
         }
     }
 }

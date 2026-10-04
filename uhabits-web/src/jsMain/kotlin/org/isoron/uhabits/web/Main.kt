@@ -1,6 +1,7 @@
 package org.isoron.uhabits.web
 
 import kotlinx.browser.window
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +32,11 @@ fun main() {
         ChangeHistory.decode(content).edit(device, id, patch).encode()
     }
     window.asDynamic().loopMerge = { local: String, remote: String -> ChangeHistory.decode(local).merge(ChangeHistory.decode(remote)).encode() }
+    window.asDynamic().loopResolve = { content: String, device: String, id: String, key: String, value: String, revisions: String ->
+        ChangeHistory.decode(content).resolve(device, id, key, Json.parseToJsonElement(value), Json.decodeFromString<Set<String>>(revisions)).encode()
+    }
+    window.asDynamic().loopRestore = { content: String, device: String, id: String, uuid: String -> ChangeHistory.decode(content).restore(device, id, uuid).encode() }
+    window.asDynamic().loopPurge = { content: String, device: String, id: String, uuid: String -> ChangeHistory.decode(content).purge(device, id, uuid).encode() }
     window.asDynamic().loopBindAccount = { content: String, account: String ->
         val history = ChangeHistory.decode(content)
         require(history.accountId == "unbound" || history.accountId == account) { "Stored habits belong to another Google account" }
@@ -40,6 +46,7 @@ fun main() {
         DrivePack.create(ChangeHistory.decode(content), device, workspace)?.encode()
     }
     window.asDynamic().loopDecodePack = { content: String, account: String, workspace: String -> DrivePack.decode(content, account, workspace).encode() }
+    window.asDynamic().loopPayloadHabits = { content: String, account: String, workspace: String -> Json.encodeToString(DrivePack.payloadHabits(content, account, workspace)) }
     window.asDynamic().loopView = { content: String, today: String, period: Int -> view(ChangeHistory.decode(content), today, period) }
     // A small JS-facing seam: the browser uses the same calculations as Android.
     window.asDynamic().loopProbe = { amountMillis: Int, notes: String ->
@@ -71,7 +78,7 @@ private fun view(history: ChangeHistory, today: String, period: Int): String {
     val date = RegisterValues.date(today)
     setToday(date)
     val result = objectValue()
-    val keys = history.changes.flatMap { it.edits.keys }.toSet()
+    val keys = history.keys()
     val weekStart = history.value("setting:weekStart")?.let { RegisterValues.number(it) } ?: 1
     result.weekStart = weekStart
     result.dayStart = history.value("setting:dayStart")?.let { RegisterValues.number(it) } ?: 0
@@ -91,11 +98,11 @@ private fun view(history: ChangeHistory, today: String, period: Int): String {
     val factory = MemoryModelFactory()
     result.habits = keys.filter { it.startsWith("habit:") }.map { it.split(':')[1] }.distinct().mapNotNull { uuid ->
         fun value(field: String) = history.value("habit:$uuid:$field")
-        if ((value("deleted") as? JsonPrimitive)?.booleanOrNull == true) return@mapNotNull null
         val trackingJson = value("tracking")
         val tracking = trackingJson?.let { TrackingSettings.fromJson(it) }
         val item = objectValue()
         item.uuid = uuid
+        item.deleted = (value("deleted") as? JsonPrimitive)?.booleanOrNull == true
         item.name = value("name")?.let { RegisterValues.text(it) } ?: "Habit with competing names"
         item.question = value("question")?.let { RegisterValues.text(it) } ?: ""
         item.description = value("description")?.let { RegisterValues.text(it) } ?: ""

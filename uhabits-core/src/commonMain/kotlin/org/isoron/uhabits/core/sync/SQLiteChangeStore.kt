@@ -83,10 +83,33 @@ class SQLiteChangeStore(private val db: Database) {
         if (current.value(register) != JsonPrimitive(value)) append(mapOf(register to JsonPrimitive(value)))
     }
 
+    @Synchronized
+    fun resolve(key: String, value: JsonElement, revisions: Set<String>) = saveLocal {
+        it.resolve(deviceId, Uuid.random().toHexString(), key, value, revisions)
+    }
+
+    @Synchronized
+    fun restore(uuid: String) = saveLocal { it.restore(deviceId, Uuid.random().toHexString(), uuid) }
+
+    @Synchronized
+    fun purge(uuid: String) = saveLocal { it.purge(deviceId, Uuid.random().toHexString(), uuid) }
+
+    private fun saveLocal(change: (ChangeHistory) -> ChangeHistory) {
+        atomic {
+            val next = change(history())
+            applyToNative(next)
+            persist(next)
+        }
+        onLocalChange?.invoke()
+    }
+
     private fun applyToNative(history: ChangeHistory) {
         val repository = HabitRepository(db)
         val entries = EntryRepository(db)
         val existing = repository.findAll().associateBy { it.uuid }.toMutableMap()
+        for (uuid in history.purgedHabits) {
+            existing.remove(uuid)?.id?.let { id -> entries.deleteByHabitId(id); repository.delete(id) }
+        }
         val keys = history.changes.flatMap { it.edits.keys }.toSet()
         val ids = keys.filter { it.startsWith("habit:") }.map { it.split(':')[1] }.toSet()
         for (uuid in ids) {

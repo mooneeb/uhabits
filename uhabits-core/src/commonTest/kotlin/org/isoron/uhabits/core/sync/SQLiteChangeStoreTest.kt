@@ -2,6 +2,9 @@ package org.isoron.uhabits.core.sync
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
+import org.isoron.platform.io.Database
+import org.isoron.platform.io.PreparedStatement
+import org.isoron.platform.io.StepResult
 import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.BaseUnitTest
 import org.isoron.uhabits.core.models.Entry
@@ -13,6 +16,74 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class SQLiteChangeStoreTest {
+    @Test
+    fun failedAcknowledgementRemainsPendingAcrossRestartAndCanBeRetried() = runTest {
+        val db = BaseUnitTest.buildMemoryDatabase()
+        try {
+            val failing = FailingDatabase(db)
+            val store = SQLiteChangeStore(failing)
+            val factory = SQLModelFactory(failing, store)
+            val habit = factory.buildHabit().apply { name = "Uploaded habit" }
+            factory.buildHabitList().add(habit)
+            store.connectAccount("original")
+            val accepted = store.history().clock.getValue(store.deviceId)
+            failing.failWrite = true
+            assertFailsWith<IllegalStateException> { store.acknowledge(accepted) }
+            val reopened = SQLiteChangeStore(db)
+            assertEquals(1, reopened.pendingCount())
+            assertEquals("Uploaded habit", SQLModelFactory(db, reopened).buildHabitList().getByUUID(habit.uuid)!!.name)
+            assertFailsWith<IllegalArgumentException> { reopened.connectAccount("different") }
+            assertEquals("original", reopened.history().accountId)
+            assertEquals(1, reopened.pendingCount())
+            reopened.connectAccount("original")
+            reopened.acknowledge(accepted)
+            assertEquals(0, SQLiteChangeStore(db).pendingCount())
+        } finally { db.close() }
+    }
+
+    @Test
+    fun failedDurableHistoryWriteRollsBackTheHabitAndItsPendingChange() = runTest {
+        val db = BaseUnitTest.buildMemoryDatabase()
+        val failing = FailingDatabase(db)
+        try {
+            val store = SQLiteChangeStore(failing)
+            val factory = SQLModelFactory(failing, store)
+            val before = store.history()
+            val habit = factory.buildHabit().apply { name = "Unsaved habit" }
+            failing.failWrite = true
+            assertFailsWith<IllegalStateException> { factory.buildHabitList().add(habit) }
+            val reopened = SQLiteChangeStore(db)
+            assertEquals(before, reopened.history())
+            assertEquals(0, reopened.pendingCount())
+            assertEquals(null, SQLModelFactory(db, reopened).buildHabitList().getByUUID(habit.uuid))
+        } finally { db.close() }
+    }
+
+    @Test
+    fun recoveryRestoresIdentityAndHistoryAndPurgeRemovesThemOnBothReplicas() = runTest {
+        val db = BaseUnitTest.buildMemoryDatabase()
+        try {
+            val store = SQLiteChangeStore(db)
+            val factory = SQLModelFactory(db, store)
+            val habits = factory.buildHabitList()
+            val habit = factory.buildHabit().apply { name = "Walk" }
+            habits.add(habit)
+            val date = LocalDate(2026, 10, 1)
+            habit.originalEntries.add(Entry(date, 12345, "Recovery note"))
+            val stale = store.history()
+            habits.remove(habit)
+            store.restore(habit.uuid!!)
+            val restored = SQLModelFactory(db, SQLiteChangeStore(db)).buildHabitList().getByUUID(habit.uuid)!!
+            assertEquals("Walk", restored.name)
+            assertEquals(Entry(date, 12345, "Recovery note"), restored.originalEntries.get(date))
+            SQLModelFactory(db, store).buildHabitList().remove(restored)
+            store.purge(habit.uuid!!)
+            store.merge(stale)
+            assertEquals(null, SQLModelFactory(db, SQLiteChangeStore(db)).buildHabitList().getByUUID(habit.uuid))
+            assertEquals(false, store.history().encode().contains("Recovery note"))
+        } finally { db.close() }
+    }
+
     @Test
     fun reorderPersistsTheVisibleOrderWhenDownloadedPositionsTie() = runTest {
         val db = BaseUnitTest.buildMemoryDatabase()
@@ -177,6 +248,23 @@ class SQLiteChangeStoreTest {
             assertEquals(1, store.pendingCount())
         } finally {
             db.close()
+        }
+    }
+
+    private class FailingDatabase(private val db: Database) : Database by db {
+        var failWrite = false
+        override fun prepareStatement(sql: String): PreparedStatement {
+            val statement = db.prepareStatement(sql)
+            return object : PreparedStatement by statement {
+                override fun step(): StepResult {
+                    if (failWrite && sql.startsWith("UPDATE LoopSyncState")) {
+                        failWrite = false
+                        statement.finalize()
+                        throw IllegalStateException("Disk write failed")
+                    }
+                    return statement.step()
+                }
+            }
         }
     }
 }
