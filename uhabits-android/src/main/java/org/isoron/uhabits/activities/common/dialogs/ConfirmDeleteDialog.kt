@@ -36,7 +36,7 @@ class ConfirmDeleteDialog(
     init {
         val res = context.resources
         setTitle(res.getQuantityString(R.plurals.delete_habits_title, quantity))
-        setMessage(res.getQuantityString(R.plurals.delete_habits_message, quantity))
+        setMessage(res.getQuantityString(R.plurals.delete_habits_recoverable_message, quantity))
         setButton(
             BUTTON_POSITIVE,
             res.getString(R.string.yes)

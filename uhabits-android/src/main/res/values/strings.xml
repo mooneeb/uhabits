@@ -99,6 +99,10 @@
         <item quantity="one">The habit will be permanently deleted. This action cannot be undone.</item>
         <item quantity="other">The habits will be permanently deleted. This action cannot be undone.</item>
     </plurals>
+    <plurals name="delete_habits_recoverable_message">
+        <item quantity="one">The habit and its history will remain in Deleted habit recovery until you explicitly purge them.</item>
+        <item quantity="other">The habits and their history will remain in Deleted habit recovery until you explicitly purge them.</item>
+    </plurals>
     <string name="habit_not_found">Habit deleted / not found</string>
     <string name="weekends">Weekends</string>
     <string name="any_weekday">Monday to Friday</string>
