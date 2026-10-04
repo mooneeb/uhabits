@@ -42,6 +42,7 @@ This installs a debug APK without uninstalling or clearing app data, then opens 
 2. Publish the Android sample with amount **12.345** and notes **Android sample — آزمائش**. Discover this run in the browser. Verify the amount is represented as **12345 thousandths**, dated **2026-10-01**, with the exact notes, and no shared-core progress mismatch. These deliberately fixed historical dates make the fixture repeatable.
 3. Publish a browser sample with amount **6.789** and notes **Browser sample — آزمائش**. Discover on Android and verify **6789 thousandths**, the date and notes, and matching score/streak. Both clients must actually discover the other producer before recording success.
 4. Publish at least one additional sample. Discover on both clients. The page size is deliberately two so three or more files exercise pagination. Save the displayed records and metrics: requests, pages, files, downloaded bytes and elapsed milliseconds. Repeat with a larger synthetic run to evaluate file growth and scan cost; no physical production packaging decision is established by one small passing run.
+   Click Measure bundled discovery to compare two files containing 1,000 synthetic records each. This measures real Drive reads and validates every record through the shared core. The producer labels simulate packaging, not additional Android-originated actions. These files have a separate packaging namespace and are deleted by their exact returned identities, including after a failed measurement.
 5. Use a second Google account that is also registered as a test user. Reconnect and discover the same run UUID; it must not see the first account's samples. Return to the original account. This harness retains neither tokens nor habit data across a page/activity restart.
 6. Verify reconnect behavior after a real token expiry/revocation. Reconnect on the original account and repeat discovery. Do not interpret merely clicking Connect twice as proof that expiry recovery works.
 7. After capturing evidence, click Delete this run's synthetic samples in the browser. Confirm only the named run. Discovery and full metadata/payload validation happen before deletion; records outside this namespace/run cannot be selected. Verify both clients discover an empty run afterward. If validation fails, inspect the synthetic record before proceeding; do not broaden the cleanup query.
@@ -49,6 +50,16 @@ This installs a debug APK without uninstalling or clearing app data, then opens 
 Both transports talk directly to Google's HTTPS APIs. They use `about.user.permissionId` for account identity; the app-data scope supports that request. [Drive account information API](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get)
 
 ## Evidence and next work
+
+### Observed on 2026-10-04
+
+The live run `ebaf3e67-4dc2-423b-b2ef-7f04e2d9be6f` used project `loop-habit-510612`, web client `436833216636-ehkfmi2pi45qosum1pm96v5v4g2kucen.apps.googleusercontent.com`, and Android client `436833216636-j50dask2qhkg5i0oa7rvj6796vradau7.apps.googleusercontent.com`. The debug APK signer SHA1 was `E2:4E:39:B9:D9:F9:F1:A5:C1:31:B5:7B:05:BD:78:1F:D3:B2:4C:14`. Android ran on the Google Play API 36 ARM64 `loop-drive-api36` emulator. The collaborative browser was Chromium 152.
+
+Real browser-to-Android and Android-to-browser discovery preserved 6.789 and 12.345 amounts, Unicode notes, the historical date, and matching shared-core scores/streaks. The 12-file run exercised six pages on each client: 18 requests, 4,940 bytes, 13,489 ms on Android and 16,599 ms in the browser. After actually revoking the Google token, both clients required reconnect. After consent, both read all 12 records again (13,064 ms Android, 16,624 ms browser).
+
+The separate packaging probe uploaded two synthetic packs totaling 2,000 records. Real discovery and complete validation used three requests, 867,768 bytes and 3,480 ms. Both probe files were deleted before it reported success. This supports bundling immutable logical changes into per-device history packs and caching already validated downloads; it does not measure Android writing such packs or establish unlimited-history performance.
+
+Cleanup deleted exactly 12 validated integration records. Subsequent discovery returned zero files on both clients. Raw token-free evidence is in ignored `build/drive-gate-evidence/`. Second-account isolation remains untested because only one test account was supplied. The production workflow and installed-PWA acceptance remain outstanding.
 
 Record the client/project configuration, APK signer, browser/device versions, test-run UUID, observed records and metrics for each direction, account isolation and reconnect outcomes, and cleanup outcome. Never capture tokens. Until the real procedure is executed, record **live gate unavailable**, not passed.
 

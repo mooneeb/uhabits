@@ -1,4 +1,5 @@
 import { DriveGate, SCOPE, validateRun } from './drive-gate.mjs';
+import { measurePackaging } from './packaging-probe.mjs';
 
 const element = id => document.getElementById(id);
 let gate;
@@ -8,7 +9,7 @@ const evaluate = (amount, notes) => JSON.parse(window.loopProbe(amount, notes));
 const status = text => { element('status').textContent = text; };
 function updateButtons() {
   for (const id of ['connect', 'new-run']) element(id).disabled = busy;
-  for (const id of ['publish', 'discover', 'cleanup']) element(id).disabled = busy || !gate || Date.now() >= expiresAt;
+  for (const id of ['publish', 'discover', 'measure', 'cleanup']) element(id).disabled = busy || !gate || Date.now() >= expiresAt;
 }
 async function action(work) {
   if (busy) return;
@@ -69,6 +70,12 @@ element('cleanup').onclick = () => action(async () => {
   const deleted = await gate.cleanup(runId);
   element('results').textContent = '';
   status(`Deleted ${deleted} verified synthetic records. Ordinary habit data was not selected.`);
+});
+element('measure').onclick = () => action(async () => {
+  status('Measuring two synthetic history packs; they will be deleted afterward…');
+  const metrics = await measurePackaging(gate, element('run-id').value.trim());
+  element('results').textContent = JSON.stringify(metrics, null, 2);
+  status('Bundled discovery verified. The two packaging samples have been deleted.');
 });
 setInterval(() => {
   if (gate && Date.now() >= expiresAt) {
