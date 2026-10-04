@@ -500,15 +500,8 @@ function showHabit(uuid) {
   form.elements.reminderEnabled.checked = !!habit?.reminder;
   if (habit?.reminder) {
     form.elements.reminderTime.value = `${String(habit.reminder.hour).padStart(2, "0")}:${String(habit.reminder.minute).padStart(2, "0")}`;
-    const days = form.elements.reminderDays;
-    if (
-      ![...days.options].some(
-        (option) => Number(option.value) === habit.reminder.days,
-      )
-    ) {
-      days.add(new Option("Custom Android days", String(habit.reminder.days)));
-    }
-    days.value = habit.reminder.days;
+    for (const checkbox of form.querySelectorAll('[name="reminderDay"]'))
+      checkbox.checked = !!(habit.reminder.days & (1 << Number(checkbox.value)));
   }
   $("habit-dialog-title").textContent = uuid ? "Edit habit" : "New habit";
   $("numeric-settings").hidden = form.elements.type.value === "0";
@@ -683,9 +676,13 @@ $("habit-form").onsubmit = async (event) => {
     ? {
         hour: time[0],
         minute: time[1],
-        days: Number(fields.reminderDays.value),
+        days: [...form.querySelectorAll('[name="reminderDay"]:checked')].reduce((mask, checkbox) => mask | (1 << Number(checkbox.value)), 0),
       }
     : null;
+  if (values.reminder && (!fields.reminderTime.value || values.reminder.days === 0)) {
+    form.querySelector(".form-error").textContent = "Choose a reminder time and at least one day.";
+    return;
+  }
   for (const [key, value] of Object.entries(values))
     if (!existing || JSON.stringify(existing[key]) !== JSON.stringify(value))
       patch[prefix + key] = value;
@@ -786,6 +783,8 @@ $("disconnect").onclick = () => {
   clearTimeout(retryTimer);
   refreshCloud();
 };
+$("update-app").hidden = temporary;
+if (testRun) $("update-app").href += `?testRun=${testRun}`;
 $("clear-local").hidden = temporary;
 $("disconnect").hidden = temporary;
 $("clear-local").onclick = async () => {
@@ -951,6 +950,11 @@ try {
     await new Promise((resolve) =>
       window.addEventListener("loop-core-ready", resolve, { once: true }),
     );
+  // Check for shell updates even when an older bundle cannot read this device's history.
+  if (!temporary && "serviceWorker" in navigator) {
+    const registration = await navigator.serviceWorker.register("sw.js");
+    registration.update().catch(() => {});
+  }
   storage = temporary ? openMemoryStorage() : await openStorage(workspace);
   state = await storage.read();
   currentView();
@@ -972,9 +976,42 @@ try {
     $("test-workspace").hidden = false;
     $("test-workspace").textContent = `Isolated workflow test: ${testRun}`;
   }
-  if (!temporary && "serviceWorker" in navigator)
-    await navigator.serviceWorker.register("sw.js");
 } catch (error) {
   $("save-status").textContent = errorMessage(error);
   $("new-habit").disabled = true;
 }
+
+function download(content, name, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$("export-backup").onclick = () => {
+  try { download(window.loopBackup(state.history), "Loop Backup.loop.json", "application/json"); }
+  catch (error) { $("import-status").textContent = errorMessage(error); }
+};
+$("export-csv").onclick = async () => {
+  try { download(await window.loopExportCSV(state.history), "Loop CSV.zip", "application/zip"); }
+  catch (error) { $("import-status").textContent = errorMessage(error); }
+};
+$("import-form").onsubmit = async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const button = form.querySelector("button");
+  button.disabled = true;
+  try {
+    const file = $("import-file").files[0];
+    if (!file || !$("confirm-import").checked) throw new Error("Choose and confirm an import file.");
+    if (file.size > 10000000) throw new Error("Import is too large (maximum 10 MB).");
+    $("import-status").textContent = "Validating import…";
+    const id = crypto.randomUUID();
+    const backup = await window.loopReadImport(new Uint8Array(await file.arrayBuffer()), id);
+    await mutateHistory((current) => window.loopImportBackup(current.history, backup, current.device, id));
+    $("import-status").textContent = "Import applied. Review any competing revisions below; synchronization status shows upload progress.";
+    form.reset();
+  } catch (error) { $("import-status").textContent = errorMessage(error); }
+  finally { button.disabled = false; }
+};

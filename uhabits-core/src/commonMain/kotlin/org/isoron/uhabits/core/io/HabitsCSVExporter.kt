@@ -44,6 +44,7 @@ class HabitsCSVExporter(
             val habitDirName = habitDirName(h)
             zip.addEntry("${habitDirName}Scores.csv", writeScores(h))
             zip.addEntry("${habitDirName}Checkmarks.csv", writeEntries(h.computedEntries))
+            zip.addEntry("${habitDirName}Original entries.csv", writeEntries(h.originalEntries))
         }
         zip.addEntry("Scores.csv", writeMultipleHabitsScores())
         zip.addEntry("Checkmarks.csv", writeMultipleHabitsCheckmarks())

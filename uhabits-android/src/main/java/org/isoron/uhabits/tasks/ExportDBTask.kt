@@ -25,7 +25,6 @@ import androidx.preference.PreferenceManager
 import org.isoron.uhabits.AndroidDirFinder
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.inject.AppContext
-import org.isoron.uhabits.utils.DatabaseUtils.saveDatabaseCopy
 import java.io.File
 import java.io.IOException
 
@@ -49,18 +48,37 @@ class ExportDBTask(
                     DocumentFile.fromFile(File(uri.path!!))
                 }
                 if (dir != null) {
-                    saveDatabaseCopy(context, dir)
+                    saveTrackingBackup(dir)
                 } else {
                     null
                 }
             } else {
                 // if public backup folder is unset, use default system folder to backup
                 val dir = system.getFilesDir("Backups") ?: return
-                saveDatabaseCopy(context, dir)
+                saveTrackingBackup(dir)
             }
         } catch (e: IOException) {
             throw RuntimeException(e)
         }
+    }
+
+    private fun backupContent() = org.isoron.uhabits.core.sync.TrackingBackup(
+        org.isoron.uhabits.HabitsApplication.component.changeStore.history()
+    ).encode()
+
+    private fun saveTrackingBackup(dir: File): String {
+        val file = File(dir, "Loop Backup ${System.currentTimeMillis()}.loop.json")
+        file.writeText(backupContent())
+        return file.absolutePath
+    }
+
+    private fun saveTrackingBackup(dir: DocumentFile): String {
+        val file = dir.createFile("application/json", "Loop Backup ${System.currentTimeMillis()}.loop.json")
+            ?: throw IOException("Could not create backup file")
+        val content = backupContent()
+        val stream = context.contentResolver.openOutputStream(file.uri) ?: throw IOException("Could not write backup file")
+        stream.use { it.write(content.toByteArray()) }
+        return file.uri.toString()
     }
 
     override fun onPostExecute() {

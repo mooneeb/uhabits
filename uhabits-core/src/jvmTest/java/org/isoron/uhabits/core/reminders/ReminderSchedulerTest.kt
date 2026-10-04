@@ -142,6 +142,25 @@ class ReminderSchedulerTest : BaseUnitTest() {
     }
 
     @Test
+    fun disablingReminderCancelsScheduledDelivery() {
+        habit.reminder = Reminder(8, 30, WeekdayList.EVERY_DAY)
+        habitList.add(habit)
+        reminderScheduler.scheduleAll()
+        habit.reminder = null
+        reminderScheduler.scheduleAll()
+        verify { sys.cancelShowReminder(habit) }
+    }
+
+    @Test
+    fun weekdaySchedulingUsesNativeSaturdayFirstMaskAndRetainsFutureSnooze() {
+        setFixedLocalTime(unixTime(2015, 0, 26, 13, 0)) // Monday; 8:30 has passed.
+        habit.reminder = Reminder(8, 30, WeekdayList(1 shl 4)) // Wednesday.
+        scheduleAndVerify(null, unixTime(2015, 0, 28, 0, 0), unixTime(2015, 0, 28, 12, 30))
+        every { widgetPreferences.getSnoozeTime(habitId) } returns unixTime(2015, 0, 27, 10, 0)
+        scheduleAndVerify(null, unixTime(2015, 0, 27, 0, 0), unixTime(2015, 0, 27, 10, 0))
+    }
+
+    @Test
     fun testSchedule_withoutReminder() {
         reminderScheduler.schedule(habit)
     }

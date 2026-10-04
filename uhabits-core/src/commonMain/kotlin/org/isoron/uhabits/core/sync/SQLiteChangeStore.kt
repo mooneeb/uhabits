@@ -94,6 +94,11 @@ class SQLiteChangeStore(private val db: Database) {
     @Synchronized
     fun purge(uuid: String) = saveLocal { it.purge(deviceId, Uuid.random().toHexString(), uuid) }
 
+    @Synchronized
+    fun importBackup(backup: TrackingBackup) = saveLocal {
+        backup.restoreInto(it, Uuid.random().toHexString(), deviceId)
+    }
+
     private fun saveLocal(change: (ChangeHistory) -> ChangeHistory) {
         atomic {
             val next = change(history())

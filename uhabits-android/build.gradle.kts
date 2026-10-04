@@ -51,8 +51,8 @@ android {
     }
 
     defaultConfig {
-        versionCode = 20301
-        versionName = "2.3.1"
+        versionCode = providers.gradleProperty("loopVersionCode").orElse("20302").get().toInt()
+        versionName = providers.gradleProperty("loopVersionName").orElse("2.3.2-personal").get()
         minSdk = 28
         targetSdk = 36
         applicationId = "org.isoron.uhabits"

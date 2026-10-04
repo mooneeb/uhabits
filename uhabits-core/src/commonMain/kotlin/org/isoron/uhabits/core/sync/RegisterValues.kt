@@ -18,7 +18,7 @@ data class RecordedEntry(val value: Int, val notes: String)
 data class ReminderSettings(val hour: Int, val minute: Int, val days: Int)
 
 object RegisterValues {
-    private val habitId = Regex("[a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
+    private val habitId = Regex("[a-f0-9]{32,70}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
 
     fun date(value: String): LocalDate {
         require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(value)) { "Invalid habit date" }

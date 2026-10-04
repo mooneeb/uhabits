@@ -99,8 +99,8 @@ data class ChangeHistory(
         for (change in changes + other.changes) {
             require(change.id.isNotBlank() && change.id.length <= 256 && Regex("[a-zA-Z0-9_-]{1,128}").matches(change.deviceId)) { "Invalid change identity" }
             require(change.sequence > 0 && (change.observed[change.deviceId] ?: 0) == change.sequence - 1 && change.observed.values.all { it > 0 }) { "Invalid causal context" }
-            // Version 2 retains empty causal envelopes after removing purged payloads.
-            require(change.edits.isNotEmpty() || purged.isNotEmpty()) { "Empty change" }
+            // Version 2 retains causal envelopes for imports and removed purge payloads.
+            require(change.edits.isNotEmpty() || schema == 2 || other.schema == 2) { "Empty change" }
             for ((key, value) in change.edits) {
                 RegisterValues.validate(key, value)
             }

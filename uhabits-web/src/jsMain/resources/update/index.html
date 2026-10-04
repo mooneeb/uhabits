@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Update Loop</title>
+<body><main><h1>Update Loop</h1>
+<p>This reloads the current application shell. Habits, pending edits, conflicts, recovery records, and purge barriers stay in this browser’s device storage. Connect to the internet before updating.</p>
+<button id="update">Load current Loop version</button><p id="status" role="status"></p>
+<script type="module">
+const status = document.querySelector('#status');
+document.querySelector('#update').onclick = async () => {
+  try {
+    const response = await fetch('../app/index.html', {cache: 'no-store'});
+    if (!response.ok) throw new Error('The current app is unavailable. Reconnect and retry.');
+    for (const registration of await navigator.serviceWorker.getRegistrations()) {
+      if (registration.scope === new URL('../app/', location.href).href) await registration.unregister();
+    }
+    for (const name of await caches.keys()) if (name.startsWith('loop-owned-shell-')) await caches.delete(name);
+    const target = new URL('../app/', location.href);
+    const run = new URLSearchParams(location.search).get('testRun');
+    if (run && /^[a-f0-9-]{36}$/.test(run)) target.searchParams.set('testRun', run);
+    location.replace(target);
+  } catch (error) { status.textContent = error.message; }
+};
+</script></main></body></html>

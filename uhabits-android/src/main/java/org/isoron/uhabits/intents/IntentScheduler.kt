@@ -65,6 +65,10 @@ class IntentScheduler(
         return SchedulerResult.OK
     }
 
+    override fun cancelShowReminder(habit: Habit) {
+        manager.cancel(pendingIntents.showReminder(habit, null, 0))
+    }
+
     override fun scheduleShowReminder(
         reminderTime: Long,
         habit: Habit,

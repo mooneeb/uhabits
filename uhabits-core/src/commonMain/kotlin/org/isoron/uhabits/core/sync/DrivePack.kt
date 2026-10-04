@@ -17,12 +17,17 @@ data class DrivePack(
     fun encode(): String = codec.encodeToString(this)
 
     fun validate(accountId: String, workspace: String): DrivePack {
-        require(schema in 1..2 && namespace == NAMESPACE && workspaceId == workspace) { "Unsupported workspace package" }
+        require(schema in 1..3 && namespace == NAMESPACE && workspaceId == workspace) { "Unsupported workspace package. Update both Loop clients before synchronizing." }
         require(history.accountId == accountId) { "Package belongs to another Google account" }
         require(Regex("[a-zA-Z0-9_-]{1,128}").matches(deviceId) && Regex("[a-zA-Z0-9_-]{1,128}").matches(workspaceId)) { "Invalid workspace identity" }
-        require(revision > 0 && history.changes.all { it.deviceId == deviceId }) { "Invalid device package" }
+        require(revision > 0 && (schema == 3 || history.changes.all { it.deviceId == deviceId })) { "Invalid device package" }
         val validated = ChangeHistory(accountId).merge(history)
-        require(validated.changes.map { it.sequence } == (1..revision).toList()) { "Incomplete device history" }
+        require(validated.changes.filter { it.deviceId == deviceId }.map { it.sequence } == (1..revision).toList()) { "Incomplete device history" }
+        if (schema == 3) {
+            require(validated.changes.all { it.sequence <= (validated.clock[it.deviceId] ?: 0) }) {
+                "Imported package has missing causal changes. Re-export a complete backup."
+            }
+        }
         return copy(history = validated)
     }
 
@@ -33,7 +38,17 @@ data class DrivePack(
         fun create(history: ChangeHistory, deviceId: String, workspace: String): DrivePack? {
             val changes = history.changes.filter { it.deviceId == deviceId }
             if (changes.isEmpty()) return null
-            return DrivePack(NAMESPACE, workspace, deviceId, changes.maxOf { it.sequence }, history.copy(changes = changes)).validate(history.accountId, workspace)
+            // Imports introduce causal sources without an online originating device.
+            // Carry the full dependency closure in the importing device's package.
+            val imported = changes.any { it.id.startsWith("import:") }
+            return DrivePack(
+                NAMESPACE,
+                workspace,
+                deviceId,
+                changes.maxOf { it.sequence },
+                if (imported) history else history.copy(changes = changes),
+                if (imported) 3 else 2
+            ).validate(history.accountId, workspace)
         }
 
         fun decode(content: String, accountId: String, workspace: String): DrivePack {

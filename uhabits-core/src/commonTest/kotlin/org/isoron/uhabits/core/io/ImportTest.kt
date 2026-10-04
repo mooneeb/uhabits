@@ -47,18 +47,14 @@ class ImportTest : BaseUnitTest() {
     }
 
     @Test
-    fun testHabitBullCSV2() = runTest {
-        importFromFile("habitbull2.csv")
-        assertEquals(6, habitList.size())
-        val habit = habitList.getByPosition(2)
-        assertEquals("H3", habit.name)
-        assertEquals("Habit 3", habit.description)
-        assertEquals(Frequency.DAILY, habit.frequency)
-        assertTrue(isChecked(habit, 2019, 4, 11))
-        assertTrue(isChecked(habit, 2019, 5, 7))
-        assertFalse(isChecked(habit, 2019, 6, 14))
-        assertTrue(isNotesEqual(habit, 2019, 4, 11, "text"))
-        assertTrue(isNotesEqual(habit, 2019, 6, 14, "Habit 3 notes"))
+    fun testMalformedHabitBullCSVIsRejectedWithoutChangingTheTracker() = runTest {
+        val file = copyResourceToTempFile("habitbull2.csv") // Contains an out-of-range negative amount.
+        try {
+            kotlin.test.assertFailsWith<IllegalArgumentException> {
+                org.isoron.uhabits.core.sync.TrackingImportReader(databaseOpener(), fileOpener, commandRunner).read(file, "invalid")
+            }
+            assertEquals(0, habitList.size())
+        } finally { file.delete() }
     }
 
     @Test

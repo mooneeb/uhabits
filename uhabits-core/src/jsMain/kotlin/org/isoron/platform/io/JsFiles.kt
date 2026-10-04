@@ -168,10 +168,10 @@ private suspend fun fetchBytes(path: String): ByteArray = suspendCoroutine { con
     )
 }
 
-class JsFileOpener(private val storage: JsFileStorage = JsFileStorage()) : FileOpener {
+class JsFileOpener(private val storage: JsFileStorage = JsFileStorage(), private val resourceRoot: String = "") : FileOpener {
     override fun openResourceFile(path: String): ResourceFile {
         val url = if (path.startsWith("migrations/")) path else "test-assets/$path"
-        return JsResourceFile(url)
+        return JsResourceFile(resourceRoot + url)
     }
 
     override fun openUserFile(path: String): UserFile = JsUserFile(storage, path)

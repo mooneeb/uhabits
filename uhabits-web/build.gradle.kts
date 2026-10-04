@@ -9,6 +9,8 @@ tasks.register<Copy>("prepareDriveGate") {
     dependsOn("jsBrowserDevelopmentWebpack", "jsProcessResources")
     from(layout.buildDirectory.dir("kotlin-webpack/js/developmentExecutable"))
     from(layout.buildDirectory.dir("processedResources/js/main"))
+    from("../uhabits-core/assets/main") { include("migrations/**"); into("app") }
+    from("../build/js/node_modules/sql.js/dist/sql-wasm.wasm") { into("app") }
     into(layout.buildDirectory.dir("drive-gate"))
     doLast {
         val output = layout.buildDirectory.dir("drive-gate").get().asFile
@@ -44,6 +46,7 @@ kotlin {
     sourceSets {
         jsMain.dependencies {
             implementation(project(":uhabits-core"))
+            implementation(libs.kotlinx.coroutines.core)
         }
     }
 }

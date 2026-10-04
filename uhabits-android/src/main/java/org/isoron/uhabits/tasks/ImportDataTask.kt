@@ -20,41 +20,38 @@ package org.isoron.uhabits.tasks
 
 import android.util.Log
 import org.isoron.platform.io.UserFile
-import org.isoron.platform.io.begin
-import org.isoron.platform.io.commit
-import org.isoron.uhabits.core.io.GenericImporter
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
+import org.isoron.uhabits.core.sync.TrackingImportReader
 import org.isoron.uhabits.core.tasks.Task
 
 class ImportDataTask(
-    private val importer: GenericImporter,
+    private val importer: TrackingImportReader,
     modelFactory: ModelFactory,
     private val file: UserFile,
-    private val listener: Listener
+    private val listener: Listener,
+    private val context: android.content.Context
 ) : Task {
     private var result = 0
+    private var failure: String? = null
     private val modelFactory: SQLModelFactory = modelFactory as SQLModelFactory
     override suspend fun doInBackground() {
-        modelFactory.database.begin()
         try {
-            if (importer.canHandle(file)) {
-                importer.importHabitsFromFile(file)
-                result = SUCCESS
-                modelFactory.database.commit()
-            } else {
-                result = NOT_RECOGNIZED
-                modelFactory.database.commit()
-            }
+            val backup = importer.read(file, java.util.UUID.randomUUID().toString())
+            requireNotNull(modelFactory.changeStore) { "Synchronized import storage is unavailable." }.importBackup(backup)
+            result = SUCCESS
         } catch (e: Exception) {
             result = FAILED
             Log.e("ImportDataTask", "Import failed", e)
-            // On failure, commit anyway to close the transaction
-            try { modelFactory.database.commit() } catch (_: Exception) {}
+            failure = e.message ?: "Import failed. Check the file format and update Loop if necessary."
         }
     }
 
     override fun onPostExecute() {
+        (context.applicationContext as org.isoron.uhabits.HabitsApplication).driveSync?.refreshNativeModels()
+        failure?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+        }
         listener.onImportDataFinished(result)
     }
 

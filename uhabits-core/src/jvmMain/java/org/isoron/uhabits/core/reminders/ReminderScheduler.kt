@@ -38,6 +38,8 @@ open class ReminderScheduler(
     private val sys: SystemScheduler,
     private val widgetPreferences: WidgetPreferences
 ) : CommandRunner.Listener {
+    private var scheduledHabits: Map<Long, Habit> = emptyMap()
+
     @Synchronized
     override fun onCommandFinished(command: Command) {
         if (command is CreateRepetitionCommand) return
@@ -51,14 +53,21 @@ open class ReminderScheduler(
             sys.log("ReminderScheduler", "Habit has null id. Returning.")
             return
         }
-        if (!habit.hasReminder()) {
-            sys.log("ReminderScheduler", "habit=" + habit.id + " has no reminder. Skipping.")
+        if (!habit.hasReminder() || habit.isArchived) {
+            sys.cancelShowReminder(habit)
             return
         }
         var reminderTime = DateUtils.getUpcomingTimeInMillis(
             habit.reminder!!.hour,
             habit.reminder!!.minute
         )
+        // Native masks start with Saturday; advance calendar dates, retaining local
+        // reminder time through daylight-saving changes.
+        val calendar = java.util.GregorianCalendar(DateUtils.fixedTimeZone ?: java.util.TimeZone.getDefault())
+        calendar.timeInMillis = reminderTime
+        val days = habit.reminder!!.days.toArray()
+        while (!days[calendar.get(java.util.Calendar.DAY_OF_WEEK) % 7]) calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+        reminderTime = calendar.timeInMillis
         val snoozeReminderTime = widgetPreferences.getSnoozeTime(habit.id!!)
         if (snoozeReminderTime != 0L) {
             val now = DateUtils.applyTimezone(DateUtils.getLocalTime())
@@ -93,8 +102,10 @@ open class ReminderScheduler(
     @Synchronized
     open fun scheduleAll() {
         sys.log("ReminderScheduler", "Scheduling all alarms")
-        val reminderHabits = habitList.getFiltered(HabitMatcher.WITH_ALARM)
-        for (habit in reminderHabits) schedule(habit)
+        val current = habitList.associateBy { it.id!! }
+        for ((id, habit) in scheduledHabits) if (id !in current) sys.cancelShowReminder(habit)
+        for (habit in habitList) schedule(habit)
+        scheduledHabits = current
     }
 
     @Synchronized
@@ -121,6 +132,8 @@ open class ReminderScheduler(
     }
 
     interface SystemScheduler {
+        fun cancelShowReminder(habit: Habit) {}
+
         fun scheduleShowReminder(
             reminderTime: Long,
             habit: Habit,

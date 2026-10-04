@@ -38,6 +38,17 @@ class HabitsCSVExporterTest : BaseUnitTest() {
     }
 
     @Test
+    fun exportKeepsOriginalUnknownAndNumericPrecisionSeparateFromComputedOutcomes() = runTest {
+        val habit = habitList.getByPosition(0)
+        habit.originalEntries.add(org.isoron.uhabits.core.models.Entry(org.isoron.platform.time.LocalDate(2026, 10, 1), -1, "Unknown note"))
+        habit.originalEntries.add(org.isoron.uhabits.core.models.Entry(org.isoron.platform.time.LocalDate(2026, 10, 2), 12345, "Precise note"))
+        val entries = ZipReader(HabitsCSVExporter(habitList, listOf(habit)).writeArchive()).entries()
+        val original = entries.first { it.name == "001 Meditate/Original entries.csv" }.content
+        assertTrue(original.contains("2026-10-01,UNKNOWN,Unknown note"))
+        assertTrue(original.contains("2026-10-02,12345,Precise note"))
+    }
+
+    @Test
     fun testExportCSV() = runTest {
         val selected: MutableList<Habit> = mutableListOf()
         for (h in habitList) selected.add(h)

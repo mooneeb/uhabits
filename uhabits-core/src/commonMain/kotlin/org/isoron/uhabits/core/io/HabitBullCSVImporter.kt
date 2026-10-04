@@ -20,7 +20,6 @@ package org.isoron.uhabits.core.io
 
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.io.UserFile
-import org.isoron.platform.io.parseCsvLine
 import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
@@ -52,13 +51,15 @@ class HabitBullCSVImporter(
     }
 
     override suspend fun importHabitsFromFile(file: UserFile) {
-        val lines = file.lines()
+        val rows = parseRows(file.lines().joinToString("\n"))
+        val numericNames = rows.drop(1).filter { it.size == 6 && it[0].isNotBlank() && parseInt(it[4]) > 1 }.map { it[0] }.toSet()
         val map = HashMap<String, Habit>()
-        for (line in lines) {
-            val cols = parseCsvLine(line)
-            if (cols.size < 6) continue
+        for (cols in rows) {
+            if (cols == listOf("")) continue
+            require(cols.size == 6) { "Invalid HabitBull CSV row. Expected six fields." }
             val name = cols[0]
             if (name == "HabitName") continue
+            require(name.isNotBlank()) { "HabitBull habit name is missing." }
             val description = cols[1]
             val date = parseDate(cols[3])
             var h = map[name]
@@ -67,45 +68,79 @@ class HabitBullCSVImporter(
                 h.name = name
                 h.description = description
                 h.frequency = Frequency.DAILY
+                if (name in numericNames) h.type = HabitType.NUMERICAL
                 habitList.add(h)
                 map[name] = h
                 logger.info("Creating habit: $name")
             }
             val notes = cols[5]
-            when (val value = parseInt(cols[4])) {
-                0 -> h.originalEntries.add(Entry(date, Entry.NO, notes))
-                1 -> h.originalEntries.add(Entry(date, Entry.YES_MANUAL, notes))
-                else -> {
-                    if (value > 1 && h.type != HabitType.NUMERICAL) {
-                        logger.info("Found a value of $value, considering this habit as numerical.")
-                        h.type = HabitType.NUMERICAL
-                    }
-                    h.originalEntries.add(Entry(date, value * 1000, notes))
-                }
+            val value = parseInt(cols[4])
+            if (h.type == HabitType.NUMERICAL) {
+                h.originalEntries.add(Entry(date, amountMillis(value), notes))
+                continue
             }
+            h.originalEntries.add(Entry(date, if (value == 0) Entry.NO else Entry.YES_MANUAL, notes))
         }
 
         map.forEach { (_, habit) -> habit.recompute() }
     }
 
-    private fun parseDate(rawValue: String): LocalDate {
-        if (rawValue.contains("-")) {
-            val parts = rawValue.split("-")
-            return LocalDate(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
+    private fun parseRows(content: String): List<List<String>> {
+        val rows = mutableListOf<List<String>>()
+        val row = mutableListOf<String>()
+        val field = StringBuilder()
+        var quoted = false
+        var closed = false
+        var index = 0
+        fun finishField() { row.add(field.toString()); field.clear(); closed = false }
+        fun finishRow() { finishField(); rows.add(row.toList()); row.clear() }
+        while (index < content.length) {
+            val char = content[index]
+            if (quoted) {
+                if (char == '"') {
+                    if (content.getOrNull(index + 1) == '"') { field.append('"'); index++ } else { quoted = false; closed = true }
+                } else {
+                    field.append(char)
+                }
+            } else {
+                when (char) {
+                    '"' -> { require(field.isEmpty() && !closed) { "Malformed CSV quotation." }; quoted = true }
+                    ',' -> finishField()
+                    '\n', '\r' -> {
+                        finishRow()
+                        if (char == '\r' && content.getOrNull(index + 1) == '\n') index++
+                    }
+                    else -> { require(!closed) { "Unexpected text after CSV quotation." }; field.append(char) }
+                }
+            }
+            index++
         }
-        if (rawValue.contains("/")) {
-            val parts = rawValue.split("/")
-            return LocalDate(parts[2].toInt(), parts[0].toInt(), parts[1].toInt())
-        }
-        throw Exception("Unrecognized date format: $rawValue")
+        require(!quoted) { "Unterminated CSV quotation. Check the import file." }
+        if (field.isNotEmpty() || row.isNotEmpty() || closed) finishRow()
+        return rows
     }
 
-    private fun parseInt(rawValue: String): Int {
-        return try {
-            rawValue.toInt()
-        } catch (e: NumberFormatException) {
-            logger.error("Could not parse int: $rawValue. Replacing by zero.")
-            0
+    private fun parseDate(rawValue: String): LocalDate {
+        val parts = if (rawValue.contains("/")) {
+            val date = rawValue.split("/")
+            require(date.size == 3) { "Invalid HabitBull date: $rawValue" }
+            listOf(date[2], date[0], date[1])
+        } else {
+            rawValue.split("-")
         }
+        require(parts.size == 3) { "Invalid HabitBull date: $rawValue" }
+        val normalized = parts.map { it.toInt() }
+        return org.isoron.uhabits.core.sync.RegisterValues.date(
+            "${normalized[0]}-${normalized[1].toString().padStart(2, '0')}-${normalized[2].toString().padStart(2, '0')}"
+        )
+    }
+
+    private fun parseInt(rawValue: String): Int = rawValue.toIntOrNull()?.also {
+        require(it >= 0) { "HabitBull values must be non-negative." }
+    } ?: throw IllegalArgumentException("Invalid HabitBull value: $rawValue")
+
+    private fun amountMillis(value: Int): Int {
+        require(value <= Int.MAX_VALUE / 1000) { "HabitBull amount is too large." }
+        return value * 1000
     }
 }

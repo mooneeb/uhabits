@@ -17,6 +17,32 @@ import kotlin.test.assertSame
 
 class SQLiteChangeStoreTest {
     @Test
+    fun olderBackupRestoreIsDurablePendingWorkAndPreservesCompetingAndIndependentEntries() = runTest {
+        val db = BaseUnitTest.buildMemoryDatabase()
+        try {
+            val store = SQLiteChangeStore(db)
+            val factory = SQLModelFactory(db, store)
+            val habit = factory.buildHabit().apply { name = "Walk" }
+            factory.buildHabitList().add(habit)
+            val oldDate = LocalDate(2026, 10, 1)
+            habit.originalEntries.add(Entry(oldDate, 12345, "Original note"))
+            val backup = TrackingBackup(store.history()).encode()
+            habit.originalEntries.add(Entry(oldDate, 6789, "Newer note"))
+            habit.originalEntries.add(Entry(LocalDate(2026, 10, 2), 3, "Skipped"))
+            store.acknowledge(store.history().clock.getValue(store.deviceId))
+            store.importBackup(TrackingBackup.decode(backup))
+            val reopened = SQLiteChangeStore(db)
+            kotlin.test.assertTrue(reopened.pendingCount() > 0)
+            assertEquals(
+                setOf(RecordedEntry(12345, "Original note"), RecordedEntry(6789, "Newer note")),
+                reopened.history().candidates("entry:${habit.uuid}:2026-10-01").map { RegisterValues.entry(it.value) }.toSet()
+            )
+            val restored = SQLModelFactory(db, reopened).buildHabitList().getByUUID(habit.uuid)!!
+            assertEquals(Entry(LocalDate(2026, 10, 2), 3, "Skipped"), restored.originalEntries.get(LocalDate(2026, 10, 2)))
+        } finally { db.close() }
+    }
+
+    @Test
     fun failedAcknowledgementRemainsPendingAcrossRestartAndCanBeRetried() = runTest {
         val db = BaseUnitTest.buildMemoryDatabase()
         try {

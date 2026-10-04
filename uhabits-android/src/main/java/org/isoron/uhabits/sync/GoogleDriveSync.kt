@@ -53,6 +53,7 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
         store.onLocalChange = {
             updateStatus("Saved on device · pending upload")
             requestSync()
+            if (store.history().accountId != "unbound" && !preferences.getBoolean("disconnected", false)) DriveSyncJobService.schedule(application, true)
         }
         component.commandRunner.addListener(object : org.isoron.uhabits.core.commands.CommandRunner.Listener {
             override fun onCommandFinished(command: org.isoron.uhabits.core.commands.Command) {}
@@ -71,7 +72,10 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
             }
         )
         executor.scheduleAtFixedRate({ if (visible > 0) synchronize() }, 30, 30, TimeUnit.SECONDS)
-        if (store.history().accountId != "unbound") updateStatus("Reconnect required · saved data available")
+        if (store.history().accountId != "unbound") {
+            updateStatus("Reconnect required · saved data available")
+            if (!preferences.getBoolean("disconnected", false)) DriveSyncJobService.schedule(application, store.pendingCount() > 0)
+        }
     }
 
     fun configureTestWorkspace(run: String) {
@@ -99,6 +103,7 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
     fun disconnect() {
         executor.execute {
             transport = null; activeToken = null; rejectedToken = null
+            DriveSyncJobService.cancel(application)
             if (!preferences.edit().putBoolean("disconnected", true).commit()) {
                 updateStatus("Could not save disconnect preference")
             } else {
@@ -150,6 +155,7 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
                 store.connectAccount(candidate.accountId)
                 check(preferences.edit().putString("email", candidate.email).putBoolean("disconnected", false).commit()) { "Could not save account configuration" }
                 transport = candidate
+                DriveSyncJobService.schedule(application, store.pendingCount() > 0)
                 updateStatus("Connected · synchronizing")
                 synchronize()
             } catch (error: Exception) { failed(error) }
@@ -163,8 +169,8 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
         }
     }
 
-    private fun synchronize() {
-        val drive = transport ?: return
+    private fun synchronize(): Boolean {
+        val drive = transport ?: return false
         updateStatus("Synchronizing · saved on device")
         try {
             val purging = store.history().purgedHabits.isNotEmpty()
@@ -185,7 +191,48 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
             val history = store.history()
             val conflicts = history.conflicts().size
             updateStatus(if (conflicts > 0) "Synchronized · $conflicts competing values preserved" else if (store.pendingCount() > 0) "Saved on device · pending upload" else "Synchronized with Drive")
-        } catch (error: Exception) { failed(error) }
+            return true
+        } catch (error: Exception) { failed(error); return false }
+    }
+
+    /** A job can request silent authorization; interactive consent never launches here. */
+    fun synchronizeInBackground(finished: (Boolean) -> Unit) {
+        if (preferences.getBoolean("disconnected", false) || store.history().accountId == "unbound") {
+            main.post { finished(false) }
+            return
+        }
+        main.post {
+            Identity.getAuthorizationClient(application).authorize(
+                AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(SCOPE))).build()
+            ).addOnSuccessListener { response ->
+                val token = response.accessToken
+                if (response.hasResolution() || token == null) {
+                    updateStatus("Reconnect required · background changes remain saved on device")
+                    finished(false)
+                } else {
+                    executor.execute {
+                        var retry = false
+                        try {
+                            if (!preferences.getBoolean("disconnected", false)) {
+                                val candidate = DriveWorkspaceTransport(token, workspace)
+                                candidate.connect()
+                                store.connectAccount(candidate.accountId)
+                                activeToken = token
+                                transport = candidate
+                                retry = !synchronize() && transport != null
+                            }
+                        } catch (error: Exception) {
+                            failed(error)
+                            retry = error !is WorkspaceAuthorizationExpired && error !is IllegalArgumentException
+                        }
+                        main.post { finished(retry) }
+                    }
+                }
+            }.addOnFailureListener {
+                updateStatus("Background sync deferred · return to Loop to reconnect")
+                finished(true)
+            }
+        }
     }
 
     private fun failed(error: Exception) {
@@ -196,17 +243,22 @@ class GoogleDriveSync(private val application: HabitsApplication) : Application.
             updateStatus(error.message!!)
         } else {
             updateStatus(error.message ?: "Sync failed · saved changes remain pending")
-            if (transport != null) requestSync(minOf(60000L, 1000L shl minOf(++failures, 6)))
+            if (transport != null && visible > 0) requestSync(minOf(60000L, 1000L shl minOf(++failures, 6)))
         }
     }
 
-    private fun refreshNativeModels() {
+    fun refreshNativeModels() {
         main.post {
             val records = HabitRepository(component.db).findAll().associateBy { it.uuid }
             val list = component.habitList
             setToday(computeToday(component.preferences.midnightDelayHours, 0))
             for (habit in list) {
-                records[habit.uuid]?.let { SQLiteHabitList.copyTo(it, habit) }
+                val record = records[habit.uuid]
+                if (record == null || record.reminderHour == null || record.archived != 0) {
+                    component.notificationTray.cancel(habit)
+                    application.getSystemService(android.app.AlarmManager::class.java).cancel(component.pendingIntentFactory.showReminder(habit, null, 0))
+                }
+                record?.let { SQLiteHabitList.copyTo(it, habit) }
                 (habit.originalEntries as? SQLiteEntryList)?.invalidate()
                 habit.recompute()
                 habit.observable.notifyListeners()

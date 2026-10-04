@@ -115,6 +115,19 @@
           <button class="primary">Save tracking settings</button>
         </form>
         <div class="card settings">
+          <h2>Backups and imports</h2>
+          <p>Export a full backup for recovery, or CSV for reading in a spreadsheet. Imports retain newer independent work and show competing values for you to resolve. Deleted and purged habits stay protected.</p>
+          <button id="export-backup" type="button">Export full backup</button>
+          <button id="export-csv" type="button">Export CSV archive</button>
+          <form id="import-form">
+            <label>Import file<input id="import-file" type="file" required accept=".json,.db,.csv,application/json" /></label>
+            <p>Loop backups, Rewire, Tickmate, and HabitBull CSV are supported.</p>
+            <label class="check"><input id="confirm-import" type="checkbox" required />Apply this file as synchronized changes</label>
+            <button type="submit">Import and reconcile</button>
+            <p id="import-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+        <div class="card settings">
           <h2>This device</h2>
           <label
             >Appearance
@@ -131,6 +144,7 @@
           </p>
           <button id="disconnect" type="button">Disconnect Google Drive</button>
           <button id="clear-local" type="button">Clear local habit data</button>
+          <a href="../update/" id="update-app">Load current app version</a>
         </div>
       </section>
       <section
@@ -239,15 +253,18 @@
             <label
               >Time
               <input name="reminderTime" type="time" value="08:00" /></label
-            ><label
-              >Days
-              <select name="reminderDays">
-                <option value="127">Every day</option>
-                <option value="62">Weekdays</option>
-                <option value="65">Weekends</option>
-              </select></label
             >
           </div>
+          <fieldset id="reminder-days"><legend>Days</legend>
+          <label class="check"><input type="checkbox" name="reminderDay" value="1" checked />Sunday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="2" checked />Monday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="3" checked />Tuesday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="4" checked />Wednesday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="5" checked />Thursday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="6" checked />Friday</label>
+          <label class="check"><input type="checkbox" name="reminderDay" value="0" checked />Saturday</label>
+          </fieldset>
+          <p>Reminders are delivered by your connected Android app.</p>
         </fieldset>
         <p class="form-error" role="alert"></p>
         <button class="primary">Save habit</button>

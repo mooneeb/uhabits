@@ -1,6 +1,8 @@
 package org.isoron.uhabits.web
 
 import kotlinx.browser.window
+import kotlinx.coroutines.await
+import kotlinx.coroutines.promise
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -26,6 +28,33 @@ import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardPresenter
 import org.isoron.uhabits.core.ui.views.LightTheme
 
 fun main() {
+    window.asDynamic().loopBackup = { content: String -> org.isoron.uhabits.core.sync.TrackingBackup(ChangeHistory.decode(content)).encode() }
+    window.asDynamic().loopImportBackup = { current: String, backup: String, device: String, id: String ->
+        org.isoron.uhabits.core.sync.TrackingBackup.decode(backup).restoreInto(ChangeHistory.decode(current), id, device).encode()
+    }
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    window.asDynamic().loopExportCSV = { content: String ->
+        scope.promise {
+            val bytes = org.isoron.uhabits.core.sync.TrackingCSV.export(ChangeHistory.decode(content))
+            val result = org.khronos.webgl.Uint8Array(bytes.size)
+            for (index in bytes.indices) result.asDynamic()[index] = bytes[index].toInt() and 255
+            result
+        }
+    }
+    window.asDynamic().loopReadImport = { input: dynamic, id: String ->
+        scope.promise {
+            val sql = org.isoron.platform.io.initSqlJs(kotlin.js.json("locateFile" to { _: String -> "../app/sql-wasm.wasm" })).await()
+            val storage = org.isoron.platform.io.JsFileStorage()
+            val files = org.isoron.platform.io.JsFileOpener(storage, "../app/")
+            val file = files.openUserFile("import")
+            val bytes = ByteArray(input.length as Int) { index -> (input[index] as Number).toByte() }
+            file.writeBytes(bytes)
+            val runner = org.isoron.uhabits.core.commands.CommandRunner(
+                org.isoron.uhabits.core.tasks.CoroutineTaskRunner(kotlinx.coroutines.Dispatchers.Default, kotlinx.coroutines.Dispatchers.Default)
+            )
+            org.isoron.uhabits.core.sync.TrackingImportReader(org.isoron.platform.io.JsDatabaseOpener(sql, storage), files, runner).read(file, id).encode()
+        }
+    }
     window.asDynamic().loopHistory = { account: String -> ChangeHistory(account).encode() }
     window.asDynamic().loopEdit = { content: String, device: String, id: String, edits: String ->
         val patch = Json.parseToJsonElement(edits) as JsonObject

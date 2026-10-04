@@ -117,7 +117,7 @@ abstract class HabitsApplicationComponent(
         preferences: Preferences,
         screen: AndroidNotificationTray
     ): NotificationTray =
-        NotificationTray(taskRunner, commandRunner, preferences, screen)
+        NotificationTray(taskRunner, commandRunner, preferences, screen, widgetPreferences)
 
     @AppScope
     @Provides

@@ -37,7 +37,8 @@ open class NotificationTray(
     private val taskRunner: TaskRunner,
     private val commandRunner: CommandRunner,
     private val preferences: Preferences,
-    private val systemTray: SystemTray
+    private val systemTray: SystemTray,
+    private val widgetPreferences: org.isoron.uhabits.core.preferences.WidgetPreferences? = null
 ) : CommandRunner.Listener, Preferences.Listener {
     private val active: MutableMap<Habit, NotificationData> = mutableMapOf()
     open fun cancel(habit: Habit) {
@@ -62,7 +63,7 @@ open class NotificationTray(
     }
 
     open fun show(habit: Habit, date: LocalDate, reminderTime: Long) {
-        val data = NotificationData(date, reminderTime)
+        val data = NotificationData(date, reminderTime, habit.id?.let { widgetPreferences?.getSnoozeTime(it) == reminderTime } == true)
         active[habit] = data
         taskRunner.execute(ShowNotificationTask(habit, data))
     }
@@ -106,10 +107,11 @@ open class NotificationTray(
         fun log(msg: String)
     }
 
-    internal class NotificationData(val date: LocalDate, val reminderTime: Long)
+    internal class NotificationData(val date: LocalDate, val reminderTime: Long, val snoozed: Boolean)
     private inner class ShowNotificationTask(private val habit: Habit, data: NotificationData) :
         Task {
         var isCompleted = false
+        private val snoozed = data.snoozed
         private val date: LocalDate = data.date
         private val reminderTime: Long = data.reminderTime
 
@@ -131,7 +133,7 @@ open class NotificationTray(
                 systemTray.log("Habit ${habit.id} is archived. Skipping.")
                 return
             }
-            if (!shouldShowReminderToday()) {
+            if (!snoozed && !shouldShowReminderToday()) {
                 systemTray.log("Habit ${habit.id} not supposed to run today. Skipping.")
                 return
             }

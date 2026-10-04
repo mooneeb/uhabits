@@ -19,16 +19,24 @@
 
 package org.isoron.uhabits.tasks
 
+import android.content.Context
 import me.tatarka.inject.annotations.Inject
+import org.isoron.platform.io.DatabaseOpener
+import org.isoron.platform.io.FileOpener
 import org.isoron.platform.io.UserFile
-import org.isoron.uhabits.core.io.GenericImporter
+import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.models.ModelFactory
+import org.isoron.uhabits.core.sync.TrackingImportReader
+import org.isoron.uhabits.inject.AppContext
 
 @Inject
 class ImportDataTaskFactory(
-    private val importer: GenericImporter,
-    private val modelFactory: ModelFactory
+    private val opener: DatabaseOpener,
+    private val files: FileOpener,
+    private val runner: CommandRunner,
+    private val modelFactory: ModelFactory,
+    @param:AppContext private val context: Context
 ) {
     fun create(file: UserFile, listener: ImportDataTask.Listener) =
-        ImportDataTask(importer, modelFactory, file, listener)
+        ImportDataTask(TrackingImportReader(opener, files, runner), modelFactory, file, listener, context)
 }
