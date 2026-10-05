@@ -40,7 +40,7 @@ export class DriveWorkspace {
       return { ...current, history };
     });
     if (
-      JSON.parse(state.history).changes.some(
+      (JSON.parse(state.history).changes || []).some(
         (change) =>
           change.deviceId === state.device && change.sequence > state.ack,
       )
