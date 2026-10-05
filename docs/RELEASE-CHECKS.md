@@ -1,8 +1,8 @@
 # Issue #4 release checks
 
-Recorded 2026-10-05. Issue #4 and parent #1 remain open while the complete parent
-acceptance matrix is being finished. Supporting tests do not replace live
-signed Android / public PWA acceptance.
+Recorded 2026-10-05. The signed Android / public PWA acceptance matrix is complete,
+including the final original-account reconnect and recorded/inferred outcome
+comparison. Supporting tests remain distinct from live acceptance.
 
 ## Environment and release
 
@@ -46,15 +46,18 @@ signed Android / public PWA acceptance.
 | Archive/reactivation and navigation | Public archive hid the numeric habit from native active list. Native Unarchive returned it to the public grid with its 1.234 record/note. Public search/name-sort/filter behaved as expected, and manual move propagated. Day/week/month/quarter/year graph periods and expandable values rendered. |
 | Shared settings | Public 3 a.m. day start selected October 4 before 3 a.m. October 5. Native Settings showed delayed day start enabled and Sunday week start. Native Monday selection then reached public Settings; public midnight selection returned the grid to October 5. Existing October-5 and older records retained their dates. |
 | Travel dates | Actual Android system time zone changed from Asia/Karachi to Pacific/Pago_Pago across the date boundary. Cold native and installed-PWA launches selected Sunday October 4 instead of Monday October 5; October-4 1.234 remained on October 4, and the installed PWA retained its cached October-5 conflict identity. Actual native full exports preserved all 65 prior causal changes and purge barriers unchanged. The sole additional change was the separately authorized October-1 account-check fixture. Asia/Karachi and automatic time-zone selection were restored afterward. |
-| Account isolation | With one pending October-3 0.125/note bound to the original test account, actual Google selection of mooneeb.hussain@gmail.com displayed “Stored habits belong to another Google account”. The app remained disconnected, retained the original account title and pending dated note, and did not adopt the other account. Original-account reconnect is the final cleanup step. |
+| Account isolation | With one pending October-3 0.125/note bound to the original test account, actual Google selection of mooneeb.hussain@gmail.com displayed “Stored habits belong to another Google account”. The app remained disconnected, retained the original account title and pending dated note, and did not adopt the other account. Original-account reconnect uploaded it; signed native entry dialog showed the exact 0.125 and Account-bound retry acceptance note. Both clients reached Synchronized with Drive, zero pending. |
 | Keyboard and touch controls | Public desktop search accepted typing and Tab moved focus to Sort. In the actual entry form, Tab moved from notes to Save entry; Enter saved the completion and closed the dialog. Public Android Chrome calendar, editor, temporary-session and launcher journeys used real touch controls. |
 | Streak/weekday comparison | Release Background Walk showed matching one-day streaks for October 3 (Skip) and October 5 (Completed) in signed native accessibility values and public details. October weekday frequency showed one recorded Monday completion and zero on every other weekday in both; native orders Saturday first, web Monday first. Both showed 5% strength. |
+| Completion undo and inference | Release Three Per Week retained October-1/2/4 original completions and an explicit October-5 Unknown undo with its keyboard-entered note. Native separately completed, marked Missed, then selected Unknown with the same note through its actual entry dialog. After reconnect both agreed: 6% strength, October 1–7 seven-day streak, and recorded Thursday/Friday/Sunday counts of one, other weekdays zero. Native calendar distinguished lighter inferred October-3/5 cells from original completions; public history labelled October-5 Unknown · inferred completion and October-3 Inferred completion. Actual native CSV contained October-5 UNKNOWN/note in Original entries, no October-3 original entry, and YES_AUTO for both in calculated Checkmarks. Native local question-mark presentation preference was restored afterward. |
 
 Screenshots and actual exported fixtures are in ignored `build/issue-4-*` files.
 Notable captures: `issue-4-upgrade-before.png`, `issue-4-upgrade-after.png`,
 `issue-4-off-weekday-snooze-delivery.png`, `issue-4-widget-background-later.png`.
 Native exports: `issue-4-signed-snooze-complete.loop.json`,
-`issue-4-signed-csv.zip`. These are synthetic dedicated-account fixtures.
+`issue-4-signed-csv.zip`, `issue-4-final-outcomes-csv.zip`. Final captures include
+`issue-4-account-original-delivery.png` and
+`issue-4-flexible-streak-frequency.png`. These are synthetic dedicated-account fixtures.
 
 ## Discovery cost validation
 
@@ -67,21 +70,16 @@ the next observed automatic cycle listed metadata with zero body downloads and
 showed Synchronized with Drive. A subsequent idle window of 95.3 seconds made four metadata requests and zero body downloads, with Synchronized with Drive displayed.
 Native 20310 reached Synchronized with Drive, zero pending.
 
-## Remaining complete-parent acceptance
+## Acceptance boundary
 
-Travel-date preservation, live account-switch rejection, keyboard/touch controls
-and streak/weekday comparisons passed. Finish original-account reconnect and
-verify delivery of the retained pending edit and final outcome fixture.
-Release Three Per Week has public October-1/2/4 completions and an explicit
-October-5 Unknown undo with its keyboard-entered note. Public history distinguishes
-that Unknown with inferred completion from October-3 inferred completion without
-an original entry. Native separately completed, marked Missed, then selected
-Unknown with the same note through its actual entry dialog. Final cross-device
-convergence and native inferred/recorded comparison await public reconnection.
-Temporary mid-save interruption remains covered by the supporting boundary-fault
-checks; live ordinary save/end/offline gating passed.
-Prior debug/local issue #2/#3 evidence is in tracking-workflows.md and
-reliability-workflows.md; it does not silently count as signed/public completion.
+All remaining primary signed/public checks passed, including travel dates,
+account-switch refusal and original-account delivery, keyboard/touch controls,
+streak/weekday agreement, and original Unknown versus derived completion.
+Temporary mid-save interruption remains supporting boundary-fault coverage, as
+permitted for rare interruptions by parent #1; live ordinary save/end/offline
+gating passed. Prior debug/local issue #2/#3 evidence remains in
+tracking-workflows.md and reliability-workflows.md and is not silently relabelled
+as signed/public evidence.
 
 ## Supporting checks
 
@@ -111,5 +109,7 @@ Resolved findings: zero-weekday cancellation, persisted custom snooze, malformed
 source database rejection, quick-action receiver lifetime through durable save,
 and purge discovery repeatedly downloading unchanged history. Both parallel
 reviewers confirmed the final purge fix, including retry/new-barrier handling.
-No material scope creep found. One remaining acceptance gap is the unfinished
-complete-parent signed/public matrix above; no issue is closed on test counts.
+No material scope creep found. The previously missing primary outcome,
+streak/weekday and keyboard observations are now recorded above, together with
+original-account delivery. Closure relies on these live results alongside
+supporting checks, rather than test counts alone.
