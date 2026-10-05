@@ -1,5 +1,9 @@
 # Personal Loop release
 
+Release [loop-20311](https://github.com/mooneeb/uhabits/releases/tag/loop-20311)
+includes the owner-signed APK, static PWA archive and SHA-256 checksums.
+Production source: `d1261fd10e690ec794d0b4b32aa0f3d870f04d99`.
+
 The public PWA is a static shell. Habit histories, dates, notes, conflicts and
 recovery records stay in each device and Google Drive's private app-data folder.
 Nginx and Cloudflare hold no Google access or refresh tokens. Temporary sessions
@@ -68,35 +72,27 @@ The lab uses Tailscale and `ssh moon@homeserver`. Remote kubectl needs
 The app namespace is `habits`. The Gateway is `gateway/main`, listener `https`,
 with the existing wildcard certificate. This path alone is Tailscale-only.
 
-The server can also use the stock nginx image with a versioned read-only asset
-directory, avoiding a local image build and privileged Docker socket:
+The deployed cluster's source of truth is
+[lunar-lab/k8s/apps/habits](https://github.com/mooneeb/lunar-lab/tree/main/k8s/apps/habits).
+It contains the namespace, static Deployment and Service, HTTPRoute, public
+configuration, Nginx configuration, tunnel Deployment and SOPS-encrypted tunnel
+Secret. The lab README documents downloading verified release files, applying
+Kustomize, separately decrypting the Secret, and rolling back in Git.
 
-```sh
-python3 scripts/package-pwa.py \
-  --web-client-id "$LOOP_WEB_CLIENT_ID" \
-  --image nginxinc/nginx-unprivileged:1.28.0-alpine \
-  --site-dir /home/moon/loop-pwa/20311/site --node homeserver \
-  --output build/release/20311/homeserver
-ssh moon@homeserver 'mkdir -p /home/moon/loop-pwa/20311'
-scp -r build/release/20311/homeserver/site \
-  build/release/20311/homeserver/kubernetes moon@homeserver:/home/moon/loop-pwa/20311/
-ssh moon@homeserver 'export KUBECONFIG="$HOME/.kube/config"; chmod -R a+rX /home/moon/loop-pwa/20311; kubectl apply -k /home/moon/loop-pwa/20311/kubernetes; kubectl rollout status -n habits deployment/loop-pwa'
-```
+The current public release uses stock unprivileged Nginx with the read-only
+`/home/moon/loop-pwa/20311/site` directory. Keep previous version directories;
+select updates and rollbacks by changing the Deployment's host path in lunar-lab.
+The pod has no service-account token and writes only `/tmp`.
 
-Keep older asset directories. Roll back by applying the previous release's
-manifests. Never overwrite an active version directory. The pod mounts only the
-static directory read-only, has no service-account token, and writes only `/tmp`.
-
-For public access create a dedicated remotely managed Cloudflare Tunnel named
-`loop-habits`, with ingress `habits.mooneeb.dev` →
-`http://loop-pwa.habits.svc.cluster.local:8080`, followed by a catch-all 404.
-Create a proxied CNAME from `habits.mooneeb.dev` to its `<UUID>.cfargotunnel.com`.
-Store its tunnel token in Secret `habits/loop-public-tunnel`, key `token`.
-Apply `deploy/public-tunnel` with Kustomize. This route publishes only this shell.
-Do not add other private lab services. Cloudflare's
-[API guide](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel-api/)
-describes the required Cloudflare Tunnel Edit and DNS Edit permissions.
-Use the lab's SOPS workflow for any credential retained in Git.
+Public access uses the dedicated remotely managed Cloudflare Tunnel
+`loop-habits` (`ded8bd3c-3628-4868-895c-449cd889258f`). Its single ingress maps
+`habits.mooneeb.dev` to `http://loop-pwa.habits.svc.cluster.local:8080`, followed
+by a catch-all 404. The proxied DNS CNAME points to the tunnel's
+`<UUID>.cfargotunnel.com`. Secret `habits/loop-public-tunnel`, key `token`, is
+retained encrypted in lunar-lab and excluded from its Kustomization. Cloudflare
+manages the ingress and DNS; Kubernetes runs the outbound connector. Other lab
+applications retain their private entry paths. The `deploy/public-tunnel`
+directory here is a generic template; use lunar-lab for this owner's cluster.
 
 Check Deployment readiness, HTTPRoute Accepted/ResolvedRefs, public `/healthz`,
 `/app/`, `/app/sql-wasm.wasm`, `/app/migrations/25.sql` and `/session/` over HTTPS.

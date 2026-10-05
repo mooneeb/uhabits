@@ -1,10 +1,50 @@
 # Issue #4 release checks
 
-Recorded 2026-10-05. The signed Android / public PWA acceptance matrix is complete,
+Recorded 2026-10-05. The 20310 signed Android / public PWA acceptance matrix is complete,
 including the final original-account reconnect and recorded/inferred outcome
 comparison. Supporting tests remain distinct from live acceptance.
 
-## Environment and release
+## Release 20311: empty Drive workspace regression
+
+The owner reported `Cannot read properties of undefined (reading 'some')` after
+reconnecting and choosing Sync now, before GitHub publication. The compiled
+history serializer omits the default empty `changes` list. Drive synchronization
+now treats that omitted list as empty, matching the facade's existing behavior.
+The regression test uses the real compiled core, serializer and memory storage;
+only the external Drive transport is replaced. It failed with the reported
+TypeError before the fix and passed afterward, including the first habit's upload
+and acknowledgement. All 11 focused Node checks passed.
+
+Production release 20311 (`2.3.11-personal`), source
+`d1261fd10e690ec794d0b4b32aa0f3d870f04d99`, passed the signed build and owner
+certificate check. Its public assets are `/home/moon/loop-pwa/20311/site`.
+The actual preview initially still loaded the old cached module; completing the
+update-page button removed the old shell cache and loaded the fixed module.
+With real owner-completed Google consent, the empty isolated workspace
+`d22d5aba-6885-4432-8808-ce7d529b7d28` reached Synchronized with Drive, including
+an explicit Sync now. Creating “First habit after empty Drive sync” through the
+real editor uploaded it and again reached Synchronized with Drive. No tokens
+were injected and the normal workspace was untouched.
+
+A real same-key `adb install -r` from 20310 to 20311 retained native account,
+habits and Synchronized with Drive. The actual numeric dialog retained `9.876`
+and “Public installed offline restart”. Evidence:
+`build/issue-4-empty-sync-red.log`, `build/issue-4-empty-sync-green.log`,
+`build/issue-4-release-20311.log`, `build/issue-4-20311-upgrade.png`.
+The earlier matrix below remains evidence for 20310; it is not relabelled as a
+full 20311 rerun. The additional change is confined to this browser sync guard.
+
+Owner cluster manifests and an encrypted copy of the existing tunnel Secret are
+committed to lunar-lab (`a469ceb`), pulled on homeserver and applied from
+`k8s/apps/habits`. Kustomize renders successfully; live diff returns zero and
+both Deployments are ready 1/1. The SOPS-decrypted credential was compared with
+the live Secret without printing it. Static release files remain outside Git.
+
+Both review axes found zero remaining findings in the new fix/regression.
+The live empty-sync and first-habit checks requested by Spec review passed.
+
+## Environment and release (20310 acceptance)
+
 
 - Public HTTPS: https://habits.mooneeb.dev/app/, dedicated Cloudflare Tunnel
   `loop-habits`, Kubernetes namespace `habits`, Deployment `loop-pwa`.
