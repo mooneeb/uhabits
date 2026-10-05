@@ -17,11 +17,12 @@ and acknowledgement. All 11 focused Node checks passed.
 
 Production release 20311 (`2.3.11-personal`), source
 `d1261fd10e690ec794d0b4b32aa0f3d870f04d99`, passed the signed build and owner
-certificate check. Its public assets are `/home/moon/loop-pwa/20311/site`.
+certificate check. Its deployed static assets were selected from a versioned
+read-only release directory.
 The actual preview initially still loaded the old cached module; completing the
 update-page button removed the old shell cache and loaded the fixed module.
-With real owner-completed Google consent, the empty isolated workspace
-`d22d5aba-6885-4432-8808-ce7d529b7d28` reached Synchronized with Drive, including
+With real owner-completed Google consent, an empty isolated workspace
+with a fresh test-run UUID reached Synchronized with Drive, including
 an explicit Sync now. Creating “First habit after empty Drive sync” through the
 real editor uploaded it and again reached Synchronized with Drive. No tokens
 were injected and the normal workspace was untouched.
@@ -34,28 +35,27 @@ and “Public installed offline restart”. Evidence:
 The earlier matrix below remains evidence for 20310; it is not relabelled as a
 full 20311 rerun. The additional change is confined to this browser sync guard.
 
-Owner cluster manifests and an encrypted copy of the existing tunnel Secret are
-committed to lunar-lab (`a469ceb`), pulled on homeserver and applied from
-`k8s/apps/habits`. Kustomize renders successfully; live diff returns zero and
-both Deployments are ready 1/1. The SOPS-decrypted credential was compared with
-the live Secret without printing it. Static release files remain outside Git.
+Deployment manifests and an encrypted copy of the existing tunnel Secret were
+retained in a separate private infrastructure repository and applied on the
+cluster. Kustomize rendered successfully; the live diff returned zero and both
+Deployments were ready 1/1. The SOPS-decrypted credential was compared with the
+live Secret without printing it. Static release files remained outside Git.
 
 Both review axes found zero remaining findings in the new fix/regression.
 The live empty-sync and first-habit checks requested by Spec review passed.
 
 ## Environment and release (20310 acceptance)
 
-
-- Public HTTPS: https://habits.mooneeb.dev/app/, dedicated Cloudflare Tunnel
-  `loop-habits`, Kubernetes namespace `habits`, Deployment `loop-pwa`.
-  `moon@homeserver`, remote kubeconfig `~/.kube/config`, context `default`.
-  Versioned read-only assets: `/home/moon/loop-pwa/20310/site`.
+- HTTPS-hosted PWA at `/app/`, served by an unprivileged Nginx Deployment
+  through a dedicated Cloudflare Tunnel. Versioned static assets were mounted
+  read-only. Personal hostnames, cluster identifiers and local paths are omitted.
 - Owner-signed APK 20310, source `7dc7a5b5`, artifact
   `build/release/20310/Loop-20310.apk`. Signature verified against the retained
-  owner certificate in RELEASE.md. Native and public static releases match.
+  release certificate. Personal certificate identifiers are omitted. Native and
+  public static releases match.
 - Actual Google consent and private Drive interoperability passed using the
-  dedicated account `m.mooneeb.h@gmail.com`, project `loop-habit-510612`, native
-  Google Play API 36 emulator `loop-owner-release-api36` (`emulator-5556`), and
+  dedicated test account and paired OAuth clients in one test project, native
+  Google Play API 36 emulator, and
   desktop Chromium through the T3 preview. No credentials/tokens were injected.
 - Public routing, signed Android OAuth registration and owner SSH access are
   working. Earlier missing prerequisites are resolved.
@@ -86,7 +86,7 @@ The live empty-sync and first-habit checks requested by Spec review passed.
 | Archive/reactivation and navigation | Public archive hid the numeric habit from native active list. Native Unarchive returned it to the public grid with its 1.234 record/note. Public search/name-sort/filter behaved as expected, and manual move propagated. Day/week/month/quarter/year graph periods and expandable values rendered. |
 | Shared settings | Public 3 a.m. day start selected October 4 before 3 a.m. October 5. Native Settings showed delayed day start enabled and Sunday week start. Native Monday selection then reached public Settings; public midnight selection returned the grid to October 5. Existing October-5 and older records retained their dates. |
 | Travel dates | Actual Android system time zone changed from Asia/Karachi to Pacific/Pago_Pago across the date boundary. Cold native and installed-PWA launches selected Sunday October 4 instead of Monday October 5; October-4 1.234 remained on October 4, and the installed PWA retained its cached October-5 conflict identity. Actual native full exports preserved all 65 prior causal changes and purge barriers unchanged. The sole additional change was the separately authorized October-1 account-check fixture. Asia/Karachi and automatic time-zone selection were restored afterward. |
-| Account isolation | With one pending October-3 0.125/note bound to the original test account, actual Google selection of mooneeb.hussain@gmail.com displayed “Stored habits belong to another Google account”. The app remained disconnected, retained the original account title and pending dated note, and did not adopt the other account. Original-account reconnect uploaded it; signed native entry dialog showed the exact 0.125 and Account-bound retry acceptance note. Both clients reached Synchronized with Drive, zero pending. |
+| Account isolation | With one pending October-3 0.125/note bound to the original test account, actual Google selection of a second dedicated account displayed “Stored habits belong to another Google account”. The app remained disconnected, retained the original account title and pending dated note, and did not adopt the other account. Original-account reconnect uploaded it; signed native entry dialog showed the exact 0.125 and Account-bound retry acceptance note. Both clients reached Synchronized with Drive, zero pending. |
 | Keyboard and touch controls | Public desktop search accepted typing and Tab moved focus to Sort. In the actual entry form, Tab moved from notes to Save entry; Enter saved the completion and closed the dialog. Public Android Chrome calendar, editor, temporary-session and launcher journeys used real touch controls. |
 | Streak/weekday comparison | Release Background Walk showed matching one-day streaks for October 3 (Skip) and October 5 (Completed) in signed native accessibility values and public details. October weekday frequency showed one recorded Monday completion and zero on every other weekday in both; native orders Saturday first, web Monday first. Both showed 5% strength. |
 | Completion undo and inference | Release Three Per Week retained October-1/2/4 original completions and an explicit October-5 Unknown undo with its keyboard-entered note. Native separately completed, marked Missed, then selected Unknown with the same note through its actual entry dialog. After reconnect both agreed: 6% strength, October 1–7 seven-day streak, and recorded Thursday/Friday/Sunday counts of one, other weekdays zero. Native calendar distinguished lighter inferred October-3/5 cells from original completions; public history labelled October-5 Unknown · inferred completion and October-3 Inferred completion. Actual native CSV contained October-5 UNKNOWN/note in Original entries, no October-3 original entry, and YES_AUTO for both in calculated Checkmarks. Native local question-mark presentation preference was restored afterward. |

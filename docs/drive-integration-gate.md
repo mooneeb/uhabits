@@ -1,6 +1,6 @@
 # Android/web Drive integration gate for issue #2
 
-This is a development checkpoint, not the completed PWA or synchronization feature. Do not expand the full UI or finalize the production file layout until the live gate passes. A build, mocked transport, or missing credentials cannot pass it. The harness never opens the ordinary habit database: all uploaded samples use the separate `loop-drive-integration-v1` namespace and a fresh test-run UUID.
+This records the initial development checkpoint before the completed PWA and synchronization feature. The gate passed before subsequent UI work; later results are in [release checks](RELEASE-CHECKS.md). A build, mocked transport, or missing credentials cannot pass a live gate. The harness never opens the ordinary habit database: all uploaded samples use the separate `loop-drive-integration-v1` namespace and a fresh test-run UUID.
 
 ## What the Google setup means
 
@@ -19,11 +19,11 @@ Use a phone signed into the test account with Google Play services. Enable Devel
 
 ## Local prerequisites and commands
 
-Use JDK 17, Android SDK platform 36/build tools, Node, Python 3, and Chrome/Chromium. Set `JAVA_HOME` to your JDK 17 directory and `sdk.dir` in ignored `local.properties` to the SDK directory. On the development Mac these are currently:
+Use JDK 17, Android SDK platform 36/build tools, Node, Python 3, and Chrome/Chromium. Set `JAVA_HOME` to your JDK 17 directory and `sdk.dir` in ignored `local.properties` to the SDK directory. Use your own installed JDK and SDK locations:
 
 ```sh
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-# local.properties: sdk.dir=/opt/homebrew/share/android-commandlinetools
+export JAVA_HOME="<YOUR_JDK_17_DIRECTORY>"
+# local.properties: sdk.dir=<YOUR_ANDROID_SDK_DIRECTORY>
 scripts/drive-gate.sh build
 scripts/drive-gate.sh serve
 ```
@@ -53,7 +53,10 @@ Both transports talk directly to Google's HTTPS APIs. They use `about.user.permi
 
 ### Observed on 2026-10-04
 
-The live run `ebaf3e67-4dc2-423b-b2ef-7f04e2d9be6f` used project `loop-habit-510612`, web client `436833216636-ehkfmi2pi45qosum1pm96v5v4g2kucen.apps.googleusercontent.com`, and Android client `436833216636-j50dask2qhkg5i0oa7rvj6796vradau7.apps.googleusercontent.com`. The debug APK signer SHA1 was `E2:4E:39:B9:D9:F9:F1:A5:C1:31:B5:7B:05:BD:78:1F:D3:B2:4C:14`. Android ran on the Google Play API 36 ARM64 `loop-drive-api36` emulator. The collaborative browser was Chromium 152.
+The live integration run used a dedicated test project with paired web and
+Android OAuth clients and a registered debug signing certificate. Personal
+project IDs, client IDs and certificate fingerprints are omitted. Android ran
+on a Google Play API 36 ARM64 emulator; the browser was Chromium 152.
 
 Real browser-to-Android and Android-to-browser discovery preserved 6.789 and 12.345 amounts, Unicode notes, the historical date, and matching shared-core scores/streaks. The 12-file run exercised six pages on each client: 18 requests, 4,940 bytes, 13,489 ms on Android and 16,599 ms in the browser. After actually revoking the Google token, both clients required reconnect. After consent, both read all 12 records again (13,064 ms Android, 16,624 ms browser).
 

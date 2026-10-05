@@ -1,56 +1,48 @@
-# Developer Guidelines
+# Contributor guidelines for this fork
 
-## Communication Channels
+This is an independent Android/web fork of [upstream Loop](https://github.com/iSoron/uhabits).
+Discuss fork bugs, feature proposals and setup problems in
+[this repository's Issues](https://github.com/mooneeb/uhabits/issues). Include the
+fork version and reproduction steps. Keep personal domains, machine paths,
+credentials and real habit backups out of public reports and examples.
 
-* Our source code is [hosted on GitHub](https://github.com/iSoron/uhabits) and this is where all the main development takes place. We use [GitHub Issues](https://github.com/iSoron/uhabits/issues) for keeping track of open bugs and open development tasks.
-* Regular users are encouraged to post feature requests and support questions under [GitHub Discussions](https://github.com/iSoron/uhabits/discussions). This is also where major announcements about the project are made.
+Use upstream's support and contribution channels only for upstream work. Store
+listings and upstream release schedules are not this fork's distribution policy.
 
-* There is also a "Technical Discussion" section on GitHub Discussions for general technical issues (e.g., project fails to build). For technical discussions related to the implementation of a particular feature, please open a draft pull request instead.
+## Scope and changes
 
-* Translations are managed in a [separate translation platform](https://translate.loophabits.org/).
+Discuss substantial changes in an issue before implementing them. State the
+problem, intended behavior and validation. Keep changes focused and separate
+unrelated refactors. Preserve upstream license/copyright notices and attribution.
 
-## Building and Testing the Project
+Prefer the existing shared tracking calculations and explicit synchronization
+boundaries. Preserve offline edits, account isolation and unresolved competing
+revisions. Test failure paths when changing storage, synchronization or imports.
+Record unavailable live prerequisites honestly; a build is not a passing Drive
+acceptance check.
 
-Please see `docs/BUILD.md` and `docs/TEST.md`
+See [BUILD.md](BUILD.md), [TEST.md](TEST.md) and [RELEASE.md](RELEASE.md).
+Issues and specifications are tracked in this fork. Coordinate contribution
+submission with the maintainer through the relevant issue.
 
-## Branching Policy
+## Code style
 
-This repository uses the [git-flow branching model](https://nvie.com/posts/a-successful-git-branching-model/). Basically, there are two main branches, `dev` and `master`. All the development takes place in the `dev` branch. After the new features have been implemented and tested, they are merged into the `master` branch and a new version of the app is released. Please submit your pull requests against the `dev` branch.
+The inherited Kotlin style uses ktlint with its configured settings. Run
+`./gradlew ktlintCheck` for relevant Kotlin changes. Follow nearby conventions for
+legacy Java and existing JavaScript/Python scripts; avoid unrelated formatting.
+New Android/core code should follow the existing Kotlin architecture.
 
-## Submitting Code
+## Documentation and releases
 
-Proposed code changes should be submitted to the project through [GitHub pull requests](https://github.com/iSoron/uhabits/pulls). For the basic steps of creating a pull request, see [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request). The following suggestions will help your pull request get merged quickly and with few changes.
+Identify the fork and link upstream early. Explain concrete differences, local
+setup, support and limitations. Use relative links between repository documents.
+Separate user instructions from architecture research and dated validation.
+[Documentation research](research/fork-documentation-and-hosting.md) explains the
+sources behind this structure; it is guidance, not a formal certification.
 
-* **Write a clear description of your proposed code changes:** Although it may look obvious to you, it's not always clear to others what your pull request is trying to accomplish. Please always describe what problem your pull request is trying to solve, and how it solves it (on a very high level). If you are fixing a bug that has not been reported before, please describe it first, including the steps to reproduce it.
-
-* If your pull request implements a completely new feature or contains large amounts of code, please **discuss it with other developers before writing it**. You are welcome to open a draft pull request outlining how you are planning to solve the problem. The draft pull request may not even contain any code.
-
-* If your pull request involves changes to the user interface, **please work on a mockup first and submit a draft pull request with your proposed UI changes** before writing the code to make it functional, to gather feedback from other developers and users. [Inkscape](https://inkscape.org/) and [Figma](https://www.figma.com/) are good tools that you can use.
-
-* **Keep your pull requests small.** Small pull requests are easy to review and can be quickly merged. The larger your pull request is, the longer it will take for others to review it and for it to get merged. Instead of submitting one large pull request that contains fixes for three separate issues, please submit three small pull requests instead.
-
-* **Keep your pull requests independent.** If you submit multiple pull requests, please make sure that each one can be merged independently of the others. If one of the pull requests needs to be rewritten, the other ones can be merged.
-
-* **Keep refactoring separate.** While implementing bug fixes and new features, you will certainly realize that other parts of our existing code could be improved. Please do not change it yet. Get your bug fix or new feature merged first, then submit a separate pull request for improving the existing code. Avoid renaming classes, removing unnecessary statements, or doing any other refactoring work on pull requests that propose bug fixes or new functionality.
-
-* **AI-assisted pull requests are welcome**, however, since they typically require additional review time to ensure code quality, they should follow the project guidelines even more strictly. In particular, keep them small, and discuss new features with other developers before writing any AI-assisted code. Large (500+ line) AI-assisted pull requests from first-time contributors that implement new features without prior discussion will be closed without consideration.
-
-Further resources:
-
-* [*How to Make Your Code Reviewer Fall in Love with You*](https://mtlynch.io/code-review-love), by Michael Lynch.
-
-## Code Style
-
-For Kotlin, we follow [ktlint](https://ktlint.github.io/) style with default settings. This code style is enforced by our automated build pipeline. To make sure that IntelliJ and Android Studio are configured according to ktlint, run `./gradlew ktlintApplyToIdea`. To check that all code is properly formatted, run `./gradlew ktlintCheck`. You can install a Git pre-commit hook to ensure that the code is properly formatted when you commit using `./gradlew addKtlintFormatGitPreCommitHook`. See more details in [ktlint-gradle](https://github.com/jlleitschuh/ktlint-gradle).
-
-For legacy Java code, we don't have strict guidelines. Please follow a code style similar to the file you are modifying. Note that new classes should be written in Kotlin. Pull requests converting existing Java code to Kotlin are also welcome.
-
-## Release Process
-
-The project loosely follows [semantic versioning](https://semver.org/), adapted for applications. Suppose, for example, that version `1.2.3` has just been released. The next version would be:
-* `1.2.4` if a bug is being fixed.
-* `1.3.0` if minor new features are being introduced.
-* `2.0.0` if major new features are being introduced.
-
-Releases are first made available to beta testers on Google Play and to all F-Droid users. After no bugs are found, they are rolled out to the remaining users. Releases are also made available on [GitHub Releases](https://github.com/iSoron/uhabits/releases).
-
+Use placeholders or reserved example domains for deployment values. Public docs
+must not depend on a maintainer's private infrastructure repository or local
+filenames. Releases should include their exact source revision, build instructions,
+checksums and actual validation results. Preserve an increasing APK version code
+and the same signing key for updates. Do not promise automatic store updates or
+access to the publisher's Google project.

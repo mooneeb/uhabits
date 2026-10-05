@@ -5,6 +5,36 @@ Loop Habit Tracker has a fairly large number of automated tests to reduce the ch
 - **Unit tests:** These tests run very quickly on the developer's computer, inside a JVM, and do not need an Android emulator or device. They typically test the correctness of core functions of the application, such as the computation of scores and streaks.
 - **Instrumented tests:** These tests require an Android emulator or device. _Medium_ instrumented tests are still quite fast to run, since only individual classes are tested. The app itself does not need to be launched. Examples include _view tests_, which render our custom views on the device and compare them against prerendered images. _Large_ instrumented tests launch the application on an Android emulator and interact with it by touching the screen, much like a regular user.
 
+## Fork synchronization and PWA checks
+
+This fork retains Loop's tests and adds reconciliation, browser storage and Drive
+boundary checks. Build the static output before Node checks because some tests
+load the real compiled Kotlin core:
+
+```sh
+./gradlew --no-configure-on-demand :uhabits-web:prepareDriveGate
+node --test scripts/tests/*.test.mjs
+./gradlew :uhabits-core:jvmTest :uhabits-android:testDebugUnitTest
+```
+
+Browser tests run through `:uhabits-core:jsBrowserTest` and
+`:uhabits-web:jsBrowserTest` with Chrome/Chromium. The recorded release run hit an
+unchanged Canvas reference-image failure and later browser timeouts; the full JS
+suite is not reported as passing. See [release checks](RELEASE-CHECKS.md) for the
+focused results and their limits.
+
+Real authorization and Android/web interoperability need actual Google consent,
+a correctly registered signer, and a dedicated test account. Start with
+[Google setup](GOOGLE-SETUP.md), [the integration gate](drive-integration-gate.md),
+[tracking workflows](tracking-workflows.md) and
+[reliability workflows](reliability-workflows.md). Keep passwords local. Use
+synthetic habits, not a person's real history. Debug test-workspace selectors and
+temporary boundary-fault checks are distinct from signed release acceptance.
+
+Compilation and mocked transport checks cannot replace real cross-device UI,
+Drive, offline restart and same-key upgrade observations. Historical evidence
+omits personal deployment identifiers.
+
 ## Running unit tests
 
 Unit tests can be launched by running `./gradlew test` or by right-clicking a particular class/method in Android Studio and selecting "Run testMethod()" or "Run ClassTest". An alternative way is to use `build.sh`, the script used by our continuous integration server. By running `./build.sh build`, the script will automatically build and run all small tests.

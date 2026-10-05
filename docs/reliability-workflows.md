@@ -14,13 +14,13 @@ Owned clients retain their original account binding through disconnects. Web cle
 
 ## Reuse the acceptance emulator
 
-The previous acceptance emulator is still installed on this Mac. Do not wipe it or clear app data: its Google test account, native synthetic history, and installed PWA are useful restart fixtures.
+Use a dedicated Google Play-enabled acceptance emulator. Preserve its test account, native synthetic history and installed PWA for restart checks; do not wipe it during a data-retention check.
 
 ```sh
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-export ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools
+export JAVA_HOME="<YOUR_JDK_17_DIRECTORY>"
+export ANDROID_SDK_ROOT="<YOUR_ANDROID_SDK_DIRECTORY>"
 export PATH="$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-emulator -avd loop-drive-api36 -no-boot-anim -no-audio -port 5554
+emulator -avd "<YOUR_TEST_AVD_NAME>" -no-boot-anim -no-audio -port 5554
 # In a separate terminal:
 adb devices
 scripts/tracking-workflow.sh build
@@ -29,7 +29,7 @@ adb install -r uhabits-android/build/outputs/apk/debug/uhabits-android-debug.apk
 adb reverse tcp:8080 tcp:8080
 ```
 
-It is the API 36 ARM64 Google Play image with a retained signed-in account. `LOOP_ADB_PORT=5038` selects the alternative adb server used by earlier sessions; the current run uses 5037. Configure OAuth and drive actual UI actions using [tracking workflows](tracking-workflows.md). Google account selection and consent remain interactive. Tests never enter passwords.
+The observed test environment used an API 36 ARM64 Google Play image with a retained signed-in test account. `LOOP_ADB_PORT=5038` selects the alternative adb server used by earlier sessions; the current run uses 5037. Configure OAuth and drive actual UI actions using [tracking workflows](tracking-workflows.md). Google account selection and consent remain interactive. Tests never enter passwords.
 
 For offline checks, disable both `adb shell svc wifi disable` and `adb shell svc data disable`, and remove `adb reverse --remove tcp:8080`. Wait for an observable committed value before force-stopping a client; a tap whose asynchronous mutation has not completed is not a successful local save. Restore both network transports and the reverse mapping afterward.
 

@@ -2,17 +2,21 @@
 
 The static PWA is at `/app/`. It uses the existing Kotlin core for habit outcomes, scores, streaks, targets and graph calculations, and synchronizes directly with Google Drive application data. Android writes its causal changes in the same SQLite transaction as habit mutations; the owned web app uses IndexedDB transactions. Google access tokens stay in memory. No habit-data server or client secret is used.
 
-This implements issue #2. Explicit conflict resolution, deletion recovery/purge, temporary sessions, imports/exports and release/cluster deployment belong to subsequent issues under #1. Competing revisions remain in durable history; ordinary edits cannot silently resolve them. ADR 0004 remains a proposal, not an accepted protocol decision.
+This records the issue #2 implementation checkpoint. Subsequent conflict resolution, deletion recovery/purge, temporary sessions, imports/exports and release validation are documented in [reliability workflows](reliability-workflows.md) and [release checks](RELEASE-CHECKS.md). Competing revisions remain in durable history; ordinary edits cannot silently resolve them. ADR 0004 remains a proposal, not an accepted protocol decision.
 
 ## Configuration and launch
 
 Use JDK 17, Android SDK 36, Node, Python 3, Chrome/Chromium and a Google Play-enabled emulator or Android device. See [the initial gate setup](drive-integration-gate.md) for Google console instructions. Both OAuth clients must belong to the same project and the account must be an authorized test user.
 
-The configured project is `loop-habit-510612`. The public web client ID is `436833216636-ehkfmi2pi45qosum1pm96v5v4g2kucen.apps.googleusercontent.com`, in `uhabits-web/src/jsMain/resources/app/config.mjs`. The Android client ID is `436833216636-j50dask2qhkg5i0oa7rvj6796vradau7.apps.googleusercontent.com`; Google matches package `org.isoron.uhabits` and the APK signer rather than an embedded Android client ID. This Mac's debug SHA1 is `E2:4E:39:B9:D9:F9:F1:A5:C1:31:B5:7B:05:BD:78:1F:D3:B2:4C:14`. A production signer requires its own OAuth registration.
+Configure your own web client ID in `uhabits-web/src/jsMain/resources/app/config.mjs`
+for local development, or pass it to `scripts/package-pwa.py` when packaging.
+Android is identified by package `org.isoron.uhabits` and the APK signing
+certificate, not an embedded Android client ID. Use `scripts/drive-gate.sh fingerprint` to inspect your debug signer. Register a production signer separately.
+See [Google setup](GOOGLE-SETUP.md).
 
 ```sh
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-# Ignored local.properties: sdk.dir=/opt/homebrew/share/android-commandlinetools
+export JAVA_HOME="<YOUR_JDK_17_DIRECTORY>"
+# Ignored local.properties: sdk.dir=<YOUR_ANDROID_SDK_DIRECTORY>
 scripts/tracking-workflow.sh build
 scripts/tracking-workflow.sh serve
 ```
@@ -85,7 +89,7 @@ On a Pixel 7 emulator, native drag can also be automated using one continuous `i
 
 ## Observed evidence, 2026-10-04
 
-The initial authorization/discovery/packaging gate passed before the full UI was built; its measurements and strictly scoped cleanup are in the separate gate document. The production workflow used isolated run `6b838f1a-1be0-43e7-927b-360762eb17ed`, API 36 Google Play ARM64 emulator `loop-drive-api36`, native debug Loop, Android Chrome 133, and desktop Chromium 152 in T3 Code.
+The initial authorization/discovery/packaging gate passed before the full UI was built; its measurements and strictly scoped cleanup are in the separate gate document. The production workflow used isolated run `6b838f1a-1be0-43e7-927b-360762eb17ed`, API 36 Google Play ARM64 emulator, native debug Loop, Android Chrome 133, and desktop Chromium 152 in T3 Code.
 
 Actual Drive propagation covered browser-created yes/no and numeric definitions, native-created Reading, independent native rename/web color changes, historical three-decimal amounts and dated notes, browser archive/native reactivation with retained history, and manual ordering in both directions. Web search and name sort produced the expected visible lists. Completed/skipped/missed/unknown dated records remained distinct. A numeric at-most habit retained its flexible frequency, unit, target and description in native Loop.
 
